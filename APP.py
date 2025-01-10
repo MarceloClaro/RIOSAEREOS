@@ -104,3 +104,25 @@ if st.button("Calcular Evapotranspiração"):
             st.error("Por favor, insira valores numéricos válidos para todas as variáveis físicas.")
     else:
         st.error("Certifique-se de carregar a imagem e preencher todas as variáveis para cada espécime.")
+
+# Adicionar a contraprova experimental
+st.header("Contraprova Experimental")
+volume_coletado = st.text_input("Volume de água coletado (mL):", "0")
+tempo_coleta = st.number_input("Tempo de coleta (horas):", min_value=1, step=1, value=24)
+
+if st.button("Comparar com a Contraprova"):
+    try:
+        volume_coletado = float(volume_coletado)
+        evapotranspiracao_experimental = volume_coletado / (tempo_coleta / 24)  # Ajustar para litros/dia
+        st.write(f"Evapotranspiração experimental estimada: {evapotranspiracao_experimental:.2f} litros/dia")
+
+        # Comparar com os resultados do modelo
+        if 'resultados' in locals():
+            for i, resultado in enumerate(resultados):
+                valor_modelo = float(resultado.split(":")[1].split("litros/dia")[0].strip())
+                diferenca = abs(valor_modelo - evapotranspiracao_experimental)
+                st.write(f"Espécime {i + 1}: Diferença entre modelo e contraprova: {diferenca:.2f} litros/dia")
+        else:
+            st.warning("Calcule a evapotranspiração pelo modelo antes de comparar.")
+    except ValueError:
+        st.error("Por favor, insira valores válidos para o volume coletado e tempo de coleta.")
