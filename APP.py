@@ -47,6 +47,14 @@ for i in range(num_especies):
     altura = st.text_input(f"Altura (m) - Espécime {i + 1}:", "0")
     diametro = st.text_input(f"Diâmetro do Tronco (cm) - Espécime {i + 1}:", "0")
     copa = st.text_input(f"Área da Copa (m²) - Espécime {i + 1}:", "0")
+    galhos = st.number_input(f"Quantidade de Galhos - Espécime {i + 1}:", min_value=1, step=1, value=1)
+
+    folhas_data = []
+    for j in range(galhos):
+        st.text(f"Dimensão Foliar por Galho {j + 1} - Espécime {i + 1}")
+        largura_folha = st.text_input(f"Largura da Folha (cm) - Galho {j + 1} - Espécime {i + 1}:", "0")
+        comprimento_folha = st.text_input(f"Comprimento da Folha (cm) - Galho {j + 1} - Espécime {i + 1}:", "0")
+        folhas_data.append((largura_folha, comprimento_folha))
 
     # Cálculo automático do LAI
     if altura != "0" and copa != "0":
@@ -55,14 +63,14 @@ for i in range(num_especies):
     else:
         lai = "0"
 
-    especies_data.append((altura, diametro, copa, lai))
+    especies_data.append((altura, diametro, copa, lai, galhos, folhas_data))
 
 # Botão para calcular evapotranspiração
 if st.button("Calcular Evapotranspiração"):
-    if uploaded_image is not None and all(all(var != "0" for var in especie) for especie in especies_data):
+    if uploaded_image is not None and all(all(var != "0" for var in especie[:4]) for especie in especies_data):
         try:
             resultados = []
-            for i, (altura, diametro, copa, lai) in enumerate(especies_data):
+            for i, (altura, diametro, copa, lai, galhos, folhas_data) in enumerate(especies_data):
                 altura = float(altura)
                 diametro = float(diametro)
                 copa = float(copa)
