@@ -6,13 +6,28 @@ except ModuleNotFoundError as e:
     print("Streamlit or PIL is not installed. Ensure the correct environment is used or install the required packages.")
     raise e
 
-# Função fictícia para calcular o LAI (Índice de Área Foliar)
-def calculate_lai(area_copa, altura):
+# Função para calcular a área foliar total
+def calculate_area_foliar_total(folhas_data, galhos):
     """
-    Calcula o LAI (Índice de Área Foliar) com base na área da copa e altura da planta.
+    Calcula a área foliar total com base nas dimensões das folhas e no número de galhos.
+    """
+    total_area = 0
+    for largura, comprimento in folhas_data:
+        try:
+            largura = float(largura)
+            comprimento = float(comprimento)
+            total_area += (largura * comprimento) * galhos  # Área de uma folha * número de galhos
+        except ValueError:
+            continue
+    return total_area
+
+# Ajuste no cálculo do LAI para usar a área foliar total
+def calculate_lai(area_foliar_total, area_copa):
+    """
+    Calcula o LAI com base na área foliar total e na área da copa.
     """
     try:
-        lai = (float(area_copa) * 0.5) / float(altura)
+        lai = area_foliar_total / float(area_copa)  # LAI baseado na área foliar total
         return round(lai, 2)
     except ZeroDivisionError:
         return 0.0
@@ -22,7 +37,6 @@ def predict_evapotranspiration(image, altura, diametro, copa, lai):
     """
     Simula a previsão de evapotranspiração baseada em uma imagem e dados físicos.
     """
-    # Simulação: ajustar essa função para integrar com um modelo real
     evapotranspiracao = (float(altura) * 0.5 + float(diametro) * 0.3 + float(copa) * 0.1 + float(lai) * 0.2) * 10
     return round(evapotranspiracao, 2)
 
@@ -56,9 +70,12 @@ for i in range(num_especies):
         comprimento_folha = st.text_input(f"Comprimento da Folha (cm) - Galho {j + 1} - Espécime {i + 1}:", "0")
         folhas_data.append((largura_folha, comprimento_folha))
 
-    # Cálculo automático do LAI
-    if altura != "0" and copa != "0":
-        lai = calculate_lai(copa, altura)
+    # Cálculo da área foliar total
+    area_foliar_total = calculate_area_foliar_total(folhas_data, galhos)
+
+    # Recalcular o LAI com base na área foliar total
+    if area_foliar_total > 0 and copa != "0":
+        lai = calculate_lai(area_foliar_total, copa)
         st.text(f"LAI Calculado para o Espécime {i + 1}: {lai}")
     else:
         lai = "0"
