@@ -28,27 +28,36 @@ if uploaded_image is not None:
 
 # Entrada de variáveis físicas
 st.header("Insira as Variáveis Físicas")
-altura = st.text_input("Altura (m):", "0")
-diametro = st.text_input("Diâmetro do Tronco (cm):", "0")
-copa = st.text_input("Área da Copa (m²):", "0")
-lai = st.text_input("LAI (Índice de Área Foliar):", "0")
+num_especies = st.number_input("Quantidade de Espécimes:", min_value=1, step=1, value=1)
+
+especies_data = []
+for i in range(num_especies):
+    st.subheader(f"Espécime {i + 1}")
+    altura = st.text_input(f"Altura (m) - Espécime {i + 1}:", "0")
+    diametro = st.text_input(f"Diâmetro do Tronco (cm) - Espécime {i + 1}:", "0")
+    copa = st.text_input(f"Área da Copa (m²) - Espécime {i + 1}:", "0")
+    lai = st.text_input(f"LAI (Índice de Área Foliar) - Espécime {i + 1}:", "0")
+    especies_data.append((altura, diametro, copa, lai))
 
 # Botão para calcular evapotranspiração
 if st.button("Calcular Evapotranspiração"):
-    if uploaded_image is not None and all([altura, diametro, copa, lai]):
+    if uploaded_image is not None and all(all(var != "0" for var in especie) for especie in especies_data):
         try:
-            # Converte as variáveis para uso no modelo
-            altura = float(altura)
-            diametro = float(diametro)
-            copa = float(copa)
-            lai = float(lai)
-            
-            # Simulação de previsão com base no modelo
-            evapotranspiracao = predict_evapotranspiration(image, altura, diametro, copa, lai)
-            
-            # Exibe o resultado
-            st.success(f"Evapotranspiração estimada: {evapotranspiracao} litros/dia")
+            resultados = []
+            for i, (altura, diametro, copa, lai) in enumerate(especies_data):
+                altura = float(altura)
+                diametro = float(diametro)
+                copa = float(copa)
+                lai = float(lai)
+
+                # Simulação de previsão com base no modelo
+                evapotranspiracao = predict_evapotranspiration(image, altura, diametro, copa, lai)
+                resultados.append(f"Espécime {i + 1}: {evapotranspiracao} litros/dia")
+
+            # Exibe os resultados
+            for resultado in resultados:
+                st.success(resultado)
         except ValueError:
-            st.error("Por favor, insira valores numéricos válidos para as variáveis físicas.")
+            st.error("Por favor, insira valores numéricos válidos para todas as variáveis físicas.")
     else:
-        st.error("Certifique-se de carregar a imagem e preencher todas as variáveis.")
+        st.error("Certifique-se de carregar a imagem e preencher todas as variáveis para cada espécime.")
