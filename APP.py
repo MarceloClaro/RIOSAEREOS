@@ -1,6 +1,10 @@
-import streamlit as st
-from PIL import Image
-import numpy as np
+try:
+    import streamlit as st
+    from PIL import Image
+    import numpy as np
+except ModuleNotFoundError as e:
+    print("Streamlit or PIL is not installed. Ensure the correct environment is used or install the required packages.")
+    raise e
 
 # Função fictícia para simular previsão de evapotranspiração
 def predict_evapotranspiration(image, altura, diametro, copa, lai):
@@ -20,7 +24,7 @@ uploaded_image = st.file_uploader("Faça o upload da imagem (formato JPG/PNG)", 
 
 if uploaded_image is not None:
     image = Image.open(uploaded_image)
-    st.image(image, caption="Imagem Carregada", use_column_width=True)
+    st.image(image, caption="Imagem Carregada", use_container_width=True)
 
 # Entrada de variáveis físicas
 st.header("Insira as Variáveis Físicas")
