@@ -6,6 +6,17 @@ except ModuleNotFoundError as e:
     print("Streamlit or PIL is not installed. Ensure the correct environment is used or install the required packages.")
     raise e
 
+# Função fictícia para calcular o LAI (Índice de Área Foliar)
+def calculate_lai(area_copa, altura):
+    """
+    Calcula o LAI (Índice de Área Foliar) com base na área da copa e altura da planta.
+    """
+    try:
+        lai = (float(area_copa) * 0.5) / float(altura)
+        return round(lai, 2)
+    except ZeroDivisionError:
+        return 0.0
+
 # Função fictícia para simular previsão de evapotranspiração
 def predict_evapotranspiration(image, altura, diametro, copa, lai):
     """
@@ -36,7 +47,14 @@ for i in range(num_especies):
     altura = st.text_input(f"Altura (m) - Espécime {i + 1}:", "0")
     diametro = st.text_input(f"Diâmetro do Tronco (cm) - Espécime {i + 1}:", "0")
     copa = st.text_input(f"Área da Copa (m²) - Espécime {i + 1}:", "0")
-    lai = st.text_input(f"LAI (Índice de Área Foliar) - Espécime {i + 1}:", "0")
+
+    # Cálculo automático do LAI
+    if altura != "0" and copa != "0":
+        lai = calculate_lai(copa, altura)
+        st.text(f"LAI Calculado para o Espécime {i + 1}: {lai}")
+    else:
+        lai = "0"
+
     especies_data.append((altura, diametro, copa, lai))
 
 # Botão para calcular evapotranspiração
