@@ -214,7 +214,7 @@ if st.button("Comparar com a Contraprova"):
         st.warning("É necessário primeiro calcular a evapotranspiração pelo modelo para todos os espécimes.")
 
 # ---------------------------------------------------------------
-# 9. Seção Explicativa Expandida com Fórmulas
+# 9. Seção Explicativa Expandida com Fórmulas e Interpretações
 # ---------------------------------------------------------------
 with st.expander("Explicação Técnica e Interpretação Detalhada"):
     st.markdown("### Cálculos e Fórmulas")
