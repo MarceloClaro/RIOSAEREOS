@@ -88,7 +88,8 @@ if st.button("Calcular Evapotranspiração"):
 
                 # Validação simples de intervalos (exemplo)
                 if not (0.5 <= altura_val <= 100):
-                    st.warning(f"Altura do Espécime {i+1} fora do intervalo plausível (0,5m - 100m).")
+                    st.warning(f"Altura do Espécime {i+1} fora do intervalo plausível (0,5m - 100m).\n"
+                               f"**Interpretação:** Alturas fora deste intervalo podem indicar erros de entrada ou medições incorretas. Por favor, verifique os valores inseridos.")
                 else:
                     st.success(f"Altura do Espécime {i+1} está dentro do intervalo plausível.")
 
@@ -102,14 +103,12 @@ if st.button("Calcular Evapotranspiração"):
                     lai_val
                 )
                 st.session_state.resultados.append(et_val)
-                
-                # Expansão do st.write com interpretação detalhada
                 st.write(f"Evapotranspiração estimada para o Espécime {i+1}: {et_val} litros/dia")
-                st.markdown("""
-                    **Explicação:** Este valor mostra a evapotranspiração estimada para o espécime, calculada com base no modelo.
-                    **Interpretação:** A evapotranspiração estimada indica a quantidade de água que é liberada pelas folhas do espécime para a atmosfera por dia, em litros. Se o valor for muito alto ou muito baixo em comparação com os outros espécimes, pode indicar a necessidade de ajustar os parâmetros do modelo ou os dados de entrada.
-                """)
+                st.write("""
+                **Explicação:** Este valor mostra a evapotranspiração estimada para cada espécime, calculada com base no modelo.
 
+                **Interpretação:** A evapotranspiração estimada indica a quantidade de água que é liberada pelas folhas do espécime para a atmosfera por dia, em litros. Se o valor for muito alto ou muito baixo em comparação com os outros espécimes, pode indicar a necessidade de ajustar os parâmetros do modelo ou os dados de entrada.
+                """)
             except ValueError:
                 st.error(f"Espécime {i+1}: Insira valores numéricos válidos.")
                 break
@@ -155,29 +154,159 @@ if st.button("Comparar com a Contraprova"):
                     evap_exps.append(vol_L_dia)
 
                 st.write("Medições (litros/dia):", [f"{v:.2f}" for v in evap_exps])
+                st.write("""
+                **Explicação:** Estas são as medições experimentais de evapotranspiração convertidas para litros por dia.
+
+                **Interpretação:** A evapotranspiração experimental reflete os valores observados diretamente. Comparar estas medições com as estimadas pelo modelo permite avaliar a precisão do modelo.
+                """)
                 media_experimental = np.mean(evap_exps)
                 et_modelo = st.session_state.resultados[i]
                 st.write(f"Média experimental: {media_experimental:.2f} litros/dia")
-                st.markdown("""
-                    **Explicação:** Exibe a média das medições experimentais de evapotranspiração, que são coletadas diretamente.
-                    **Interpretação:** Esta média reflete o valor central das medições experimentais. Se a média experimental for semelhante ao valor previsto pelo modelo, isso sugere que o modelo está representando adequadamente a evapotranspiração. Caso contrário, pode ser necessário investigar as causas da discrepância.
+                st.write("""
+                **Explicação:** Exibe a média das medições experimentais de evapotranspiração, que são coletadas diretamente.
+
+                **Interpretação:** Esta média reflete o valor central das medições experimentais. Se a média experimental for semelhante ao valor previsto pelo modelo, isso sugere que o modelo está representando adequadamente a evapotranspiração. Caso contrário, pode ser necessário investigar as causas da discrepância.
                 """)
                 st.write(f"Valor previsto pelo modelo: {et_modelo:.2f} litros/dia")
-                st.markdown("""
-                    **Explicação:** Exibe o valor previsto pelo modelo de evapotranspiração, calculado com base nas variáveis inseridas (altura, diâmetro, copa, LAI).
-                    **Interpretação:** Este é o valor que o modelo estima para a evapotranspiração do espécime. Comparar esse valor com as medições experimentais ajuda a avaliar a precisão do modelo. Uma diferença muito grande pode indicar que o modelo precisa ser aprimorado.
+                st.write("""
+                **Explicação:** Exibe o valor previsto pelo modelo de evapotranspiração, calculado com base nas variáveis inseridas (altura, diâmetro, copa, LAI).
+
+                **Interpretação:** Este é o valor que o modelo estima para a evapotranspiração do espécime. Comparar esse valor com as medições experimentais ajuda a avaliar a precisão do modelo. Uma diferença muito grande pode indicar que o modelo precisa ser aprimorado.
                 """)
 
-                # Exibição da diferença absoluta
-                diferenca_abs = abs(media_experimental - et_modelo)
-                st.write(f"Diferença (modelo x experimento): {diferenca_abs:.2f} litros/dia")
-                st.markdown("""
+                valores_unicos = set(evap_exps)
+                if len(evap_exps) < 2 or len(valores_unicos) < 2:
+                    st.warning(
+                        "Não é possível realizar o teste com uma única medição ou valores idênticos. "
+                        "O teste exige pelo menos 2 valores distintos.\n"
+                        "Recomenda-se coletar mais medições em diferentes condições para análises mais robustas."
+                    )
+                    diferenca_abs = abs(media_experimental - et_modelo)
+                    st.write(f"Diferença (modelo x experimento): {diferenca_abs:.2f} litros/dia")
+                    st.write("""
                     **Explicação:** Mostra a diferença absoluta entre o valor do modelo e o valor experimental.
-                    **Interpretação:** A diferença absoluta fornece uma medida direta de quão distante o modelo está das medições experimentais. Se a diferença for pequena, isso indica que o modelo está ajustado corretamente; se for grande, pode ser necessário revisar o modelo ou os dados experimentais.
-                """)
 
-            except ValueError:
-                st.error(f"Espécime {i+1}: Insira valores experimentais válidos (números).")
+                    **Interpretação:** A diferença absoluta fornece uma medida direta de quão distante o modelo está das medições experimentais. Se a diferença for pequena, isso indica que o modelo está ajustado corretamente; se for grande, pode ser necessário revisar o modelo ou os dados experimentais.
+                    """)
+                else:
+                    p_value = None
+                    if test_type == "Teste t de Student (1 amostra)":
+                        stat, p_value = stats.ttest_1samp(evap_exps, et_modelo)
+                        st.write(f"T-estatística: {stat:.4f}")
+                        st.write("""
+                        **Explicação:** A T-estatística quantifica a diferença entre a média experimental e o valor do modelo, normalizada pela variabilidade dos dados.
+
+                        **Interpretação:** Quanto maior for o valor absoluto da T-estatística, mais significativa será a diferença entre a média experimental e o valor do modelo.
+                        """)
+                        st.write(f"P-valor: {p_value:.6f}")
+                        st.write("""
+                        **Explicação:** O P-valor indica a probabilidade de observarmos uma diferença tão extrema quanto a observada, assumindo que a hipótese nula seja verdadeira.
+
+                        **Interpretação:** 
+                        - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula de que não há diferença entre a média experimental e o valor do modelo.
+                        - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa. Não temos evidências suficientes para rejeitar a hipótese nula.
+                        """)
+
+                    elif test_type == "Teste de Mann-Whitney":
+                        stat, p_value = stats.mannwhitneyu(evap_exps, [et_modelo]*len(evap_exps), alternative='two-sided')
+                        st.write(f"Estatística U: {stat:.4f}")
+                        st.write("""
+                        **Explicação:** A Estatística U mede a diferença entre as distribuições dos dados experimentais e do modelo.
+
+                        **Interpretação:** 
+                        - **Valores U baixos** indicam uma grande diferença entre as distribuições.
+                        - **Valores U altos** indicam uma menor diferença entre as distribuições.
+                        """)
+                        st.write(f"P-valor (Mann-Whitney): {p_value:.6f}")
+                        st.write("""
+                        **Explicação:** O P-valor determina se a diferença observada nas distribuições é significativa.
+
+                        **Interpretação:** 
+                        - **Se p < 0,05**: As distribuições são significativamente diferentes. Rejeitamos a hipótese nula de que as distribuições são idênticas.
+                        - **Se p ≥ 0,05**: As distribuições não são significativamente diferentes. Não rejeitamos a hipótese nula.
+                        """)
+
+                    elif test_type == "Teste de Wilcoxon":
+                        differences = np.array(evap_exps) - et_modelo
+                        if np.all(differences == 0):
+                            st.warning("Diferenças nulas impossibilitam o teste Wilcoxon.\n"
+                                       "Isso ocorre quando todas as medições são idênticas ao valor do modelo.")
+                        else:
+                            try:
+                                stat, p_value = stats.wilcoxon(differences)
+                                st.write(f"Estatística W: {stat:.4f}")
+                                st.write("""
+                                **Explicação:** A Estatística W do Teste de Wilcoxon mede a soma das diferenças ordenadas das medições experimentais em relação ao modelo.
+
+                                **Interpretação:** 
+                                - **W alto**: Indica uma grande diferença entre as amostras pareadas.
+                                - **W baixo**: Indica uma diferença menor.
+                                """)
+                                st.write(f"P-valor (Wilcoxon): {p_value:.6f}")
+                                st.write("""
+                                **Explicação:** O P-valor determina se a diferença observada nas medições pareadas é significativa.
+
+                                **Interpretação:** 
+                                - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula de que não há diferença nas medianas das amostras pareadas.
+                                - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa. Não rejeitamos a hipótese nula.
+                                """)
+                            except Exception as e:
+                                st.error(f"Erro no teste de Wilcoxon: {e}")
+
+                    elif test_type == "Teste de Sinal":
+                        differences = np.array(evap_exps) - et_modelo
+                        nonzero_diff = differences[differences != 0]
+                        n = len(nonzero_diff)
+                        if n == 0:
+                            st.warning("Todos os valores experimentais são iguais ao valor do modelo.\n"
+                                       "O teste de Sinal não pode ser aplicado quando todas as diferenças são nulas.")
+                        else:
+                            pos = np.sum(nonzero_diff > 0)
+                            res = stats.binomtest(pos, n, 0.5)
+                            st.write(f"Número de diferenças não-nulas: {n}")
+                            st.write("""
+                            **Explicação:** Este valor indica quantas das diferenças entre as medições experimentais e o modelo são positivas.
+
+                            **Interpretação:** 
+                            - **Maior número de sinais positivos**: Mais medições experimentais estão acima do modelo.
+                            - **Maior número de sinais negativos**: Mais medições experimentais estão abaixo do modelo.
+                            """)
+                            st.write(f"Número de sinais positivos: {pos}")
+                            st.write(f"P-valor (Teste de Sinal): {res.pvalue:.6f}")
+                            st.write("""
+                            **Explicação:** O P-valor determina se a proporção de sinais positivos é significativamente diferente de 0,5.
+
+                            **Interpretação:** 
+                            - **Se p < 0,05**: A proporção de sinais positivos é significativamente diferente de 0,5, indicando uma tendência estatística.
+                            - **Se p ≥ 0,05**: Não há evidências suficientes para afirmar que a proporção de sinais positivos difere de 0,5.
+                            """)
+
+                    else:  # Diferença Absoluta
+                        diferenca_abs = abs(media_experimental - et_modelo)
+                        st.write(f"Diferença Absoluta (modelo x experimento): {diferenca_abs:.2f} litros/dia")
+                        st.write("""
+                        **Explicação:** Calcula a diferença direta entre o valor previsto pelo modelo e a média das medições experimentais.
+
+                        **Interpretação:** 
+                        - **Diferença pequena**: O modelo está ajustado corretamente às medições experimentais.
+                        - **Diferença grande**: Pode ser necessário revisar o modelo ou os dados experimentais para melhorar a precisão.
+                        """)
+
+                    if p_value is not None:
+                        alpha = 0.05
+                        if p_value < alpha:
+                            st.error("Diferença estatisticamente significativa (p < 0.05).")
+                            st.write("""
+                            **Interpretação:** A diferença entre o modelo e as medições experimentais é significativa. Isso sugere que o modelo não está representando adequadamente os dados experimentais e pode precisar de ajustes.
+                            """)
+                        else:
+                            st.info("Diferença não é estatisticamente significativa (p ≥ 0.05).")
+                            st.write("""
+                            **Interpretação:** Não há diferença significativa entre o modelo e as medições experimentais. Isso sugere que o modelo está representando adequadamente a evapotranspiração observada.
+                            """)
+
+                except ValueError:
+                    st.error(f"Espécime {i+1}: Insira valores experimentais válidos (números).")
     else:
         st.warning("É necessário primeiro calcular a evapotranspiração pelo modelo para todos os espécimes.")
 
@@ -198,7 +327,7 @@ with st.expander("Explicação Técnica e Interpretação Detalhada"):
     st.latex(r'''
     \text{ET (litros/dia)} = 
     [0.5 \times \text{Altura (m)} + 0.3 \times \text{Diâmetro (cm)} 
-    + 0.1 \times \text{Área de Copa (m²)} + 0.2 \times \text{LAI}] \times 10
+    + 0.1 \times \text{Área da Copa (m²)} + 0.2 \times \text{LAI}] \times 10
     ''')
     st.markdown("""
     ## Testes Estatísticos
