@@ -195,13 +195,12 @@ if st.button("Comparar com a Contraprova"):
                             st.write(f"Número de diferenças não-nulas: {n}")
                             st.write(f"Número de sinais positivos: {pos}")
                             st.write(f"P-valor (Teste de Sinal): {res.pvalue:.6f}")
-                            p_value = res.pvalue  # para consistência posterior
+                            p_value = res.pvalue
 
                     else:  # Diferença Absoluta
                         diferenca_abs = abs(media_experimental - et_modelo)
                         st.write(f"Diferença Absoluta (modelo x experimento): {diferenca_abs:.2f} litros/dia")
 
-                    # Interpretação geral caso p_value tenha sido obtido
                     if p_value is not None:
                         alpha = 0.05
                         if p_value < alpha:
@@ -215,9 +214,24 @@ if st.button("Comparar com a Contraprova"):
         st.warning("É necessário primeiro calcular a evapotranspiração pelo modelo para todos os espécimes.")
 
 # ---------------------------------------------------------------
-# 9. Seção Explicativa Expandida
+# 9. Seção Explicativa Expandida com Fórmulas
 # ---------------------------------------------------------------
 with st.expander("Explicação Técnica e Interpretação Detalhada"):
+    st.markdown("### Cálculos e Fórmulas")
+    st.markdown("**Área Foliar Total (AFT):**")
+    st.latex(r'''
+    \text{AFT} = \sum_{i=1}^{n} (\text{largura}_i \times \text{comprimento}_i) \times \text{galhos}
+    ''')
+    st.markdown("**Índice de Área Foliar (LAI):**")
+    st.latex(r'''
+    \text{LAI} = \frac{\text{AFT}}{\text{Área da Copa}}
+    ''')
+    st.markdown("**Evapotranspiração (Modelo):**")
+    st.latex(r'''
+    \text{ET (litros/dia)} = 
+    [0.5 \times \text{Altura (m)} + 0.3 \times \text{Diâmetro (cm)} 
+    + 0.1 \times \text{Área de Copa (m²)} + 0.2 \times \text{LAI}] \times 10
+    ''')
     st.markdown("""
     ## Testes Estatísticos
     - **Teste t de Student:** Compara a média de um conjunto de dados com um valor hipotético.
@@ -231,10 +245,7 @@ with st.expander("Explicação Técnica e Interpretação Detalhada"):
 
     ## Melhores Práticas Finais
     - Validar dados de entrada: ex. altura entre 0,5m e 100m, diâmetro em faixas plausíveis, etc.
-    - Incorporar dados climáticos (temperatura, umidade, radiação solar) para melhorar 
-      a precisão do modelo de evapotranspiração.
-    - Utilizar modelos avançados, como **CNNs**, treinados com dados reais para estimar 
-      a evapotranspiração.
-    - Fornecer múltiplas medições para cada espécime em diferentes condições para 
-      aumentar a robustez da contraprova.
+    - Incorporar dados climáticos (temperatura, umidade, radiação solar) para melhorar a precisão do modelo de evapotranspiração.
+    - Utilizar modelos avançados, como **CNNs**, treinados com dados reais para estimar a evapotranspiração.
+    - Fornecer múltiplas medições para cada espécime em diferentes condições para aumentar a robustez da contraprova.
     """)
