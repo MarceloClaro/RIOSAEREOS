@@ -47,7 +47,7 @@ def predict_evapotranspiration(image, altura, diametro, copa, lai, temperatura, 
 # ---------------------------------------------------------------
 # 3. Cabeçalho e título com ícone/emoji
 # ---------------------------------------------------------------
-st.title("🌱 Estimativa de Evapotranspiração por CNN (Versão Ajustada)")
+st.title("🌱 Estimativa de Evapotranspiração (Rios Aéreos)")
 
 # ---------------------------------------------------------------
 # 4. Carregar imagem
