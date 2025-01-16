@@ -2,14 +2,15 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import scipy.stats as stats
+import pandas as pd  # Import para trabalhar com DataFrame
 
 # ---------------------------------------------------------------
 # 1. Armazenamento em session_state para persistência
 # ---------------------------------------------------------------
 if "resultados" not in st.session_state:
-    st.session_state.resultados = []  # Evapotranspirações (modelo)
+    st.session_state.resultados = []  # Lista de evapotranspirações calculadas
 if "historico" not in st.session_state:
-    st.session_state.historico = []  # Histórico de resultados
+    st.session_state.historico = []  # Histórico de resultados como lista de tuplas (Espécime, Valor)
 if "uploaded_image" not in st.session_state:
     st.session_state.uploaded_image = None
 
@@ -91,7 +92,7 @@ if st.button("💧 Calcular Evapotranspiração"):
                 # Validação simples de intervalos (exemplo)
                 if not (0.5 <= altura_val <= 100):
                     st.warning(f"⚠️ Altura do Espécime {i+1} fora do intervalo plausível (0,5m - 100m).\n"
-                               f"**Interpretação:** Alturas fora deste intervalo podem indicar erros de entrada ou medições incorretas. Por favor, verifique os valores inseridos.")
+                               "**Interpretação:** Alturas fora deste intervalo podem indicar erros de entrada ou medições incorretas. Por favor, verifique os valores inseridos.")
                 else:
                     st.success(f"✅ Altura do Espécime {i+1} está dentro do intervalo plausível.")
 
@@ -111,10 +112,8 @@ if st.button("💧 Calcular Evapotranspiração"):
 
                 **Interpretação:** A evapotranspiração estimada indica a quantidade de água que é liberada pelas folhas do espécime para a atmosfera por dia, em litros. Se o valor for muito alto ou muito baixo em comparação com os outros espécimes, pode indicar a necessidade de ajustar os parâmetros do modelo ou os dados de entrada.
                 """)
-
-                # Gravação no histórico
-                st.session_state.historico.append(f"Espécime {i+1}: {et_val} litros/dia")
-
+                # Adicionar ao histórico como tupla (Espécime, Valor)
+                st.session_state.historico.append((i+1, et_val))
             except ValueError:
                 st.error(f"⚠️ Espécime {i+1}: Insira valores numéricos válidos.")
                 break
@@ -236,7 +235,7 @@ if st.button("🔄 Comparar com a Contraprova"):
                         differences = np.array(evap_exps) - et_modelo
                         if np.all(differences == 0):
                             st.warning("⚠️ Diferenças nulas impossibilitam o teste Wilcoxon.\n"
-                                       "🔍 **Interpretação:** Isso ocorre quando todas as medições são idênticas ao valor do modelo.")
+                                       "**Interpretação:** Isso ocorre quando todas as medições são idênticas ao valor do modelo.")
                         else:
                             try:
                                 stat, p_value = stats.wilcoxon(differences)
@@ -253,8 +252,8 @@ if st.button("🔄 Comparar com a Contraprova"):
                                 **Explicação:** O P-valor determina se a diferença observada nas medições pareadas é significativa.
 
                                 **Interpretação:** 
-                                - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula de que não há diferença nas medianas das amostras pareadas.
-                                - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa. Não rejeitamos a hipótese nula.
+                                - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula.
+                                - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa.
                                 """)
                             except Exception as e:
                                 st.error(f"⚠️ Erro no teste de Wilcoxon: {e}")
@@ -265,7 +264,7 @@ if st.button("🔄 Comparar com a Contraprova"):
                         n = len(nonzero_diff)
                         if n == 0:
                             st.warning("⚠️ Todos os valores experimentais são iguais ao valor do modelo.\n"
-                                       "🔍 **Interpretação:** O teste de Sinal não pode ser aplicado quando todas as diferenças são nulas.")
+                                       "**Interpretação:** O teste de Sinal não pode ser aplicado quando todas as diferenças são nulas.")
                         else:
                             pos = np.sum(nonzero_diff > 0)
                             res = stats.binomtest(pos, n, 0.5)
@@ -274,8 +273,8 @@ if st.button("🔄 Comparar com a Contraprova"):
                             **Explicação:** Este valor indica quantas das diferenças entre as medições experimentais e o modelo são positivas.
 
                             **Interpretação:** 
-                            - **Maior número de sinais positivos**: Mais medições experimentais estão acima do modelo.
-                            - **Maior número de sinais negativos**: Mais medições experimentais estão abaixo do modelo.
+                            - **Maior número de sinais positivos**: Mais medições estão acima do modelo.
+                            - **Maior número de sinais negativos**: Mais medições estão abaixo do modelo.
                             """)
                             st.write(f"📈 **Número de sinais positivos:** {pos}")
                             st.write(f"🔢 **P-valor (Teste de Sinal):** {res.pvalue:.6f}")
@@ -284,7 +283,7 @@ if st.button("🔄 Comparar com a Contraprova"):
 
                             **Interpretação:** 
                             - **Se p < 0,05**: A proporção de sinais positivos é significativamente diferente de 0,5, indicando uma tendência estatística.
-                            - **Se p ≥ 0,05**: Não há evidências suficientes para afirmar que a proporção de sinais positivos difere de 0,5.
+                            - **Se p ≥ 0,05**: Não há evidências suficientes para afirmar que a proporção difere de 0,5.
                             """)
 
                     else:  # Diferença Absoluta
@@ -294,21 +293,21 @@ if st.button("🔄 Comparar com a Contraprova"):
                         **Explicação:** Calcula a diferença direta entre o valor previsto pelo modelo e a média das medições experimentais.
 
                         **Interpretação:** 
-                        - **Diferença pequena**: O modelo está ajustado corretamente às medições experimentais.
-                        - **Diferença grande**: Pode ser necessário revisar o modelo ou os dados experimentais para melhorar a precisão.
+                        - **Diferença pequena**: O modelo está ajustado corretamente.
+                        - **Diferença grande**: Revisar modelo ou dados experimentais.
                         """)
 
                     if p_value is not None:
                         alpha = 0.05
                         if p_value < alpha:
-                            st.error("❌ **Diferença estatisticamente significativa (p < 0.05).**")
+                            st.error("❌ Diferença estatisticamente significativa (p < 0.05).")
                             st.write("""
-                            **Interpretação:** A diferença entre o modelo e as medições experimentais é significativa. Isso sugere que o modelo não está representando adequadamente os dados experimentais e pode precisar de ajustes.
+                            **Interpretação:** A diferença entre o modelo e as medições é significativa. O modelo pode precisar de ajustes.
                             """)
                         else:
-                            st.info("✅ **Diferença não é estatisticamente significativa (p ≥ 0.05).**")
+                            st.info("✅ Diferença não é estatisticamente significativa (p ≥ 0.05).")
                             st.write("""
-                            **Interpretação:** Não há diferença significativa entre o modelo e as medições experimentais. Isso sugere que o modelo está representando adequadamente a evapotranspiração observada.
+                            **Interpretação:** Não há diferença significativa entre o modelo e as medições. O modelo parece adequado.
                             """)
 
             except ValueError:
@@ -317,7 +316,25 @@ if st.button("🔄 Comparar com a Contraprova"):
         st.warning("⚠️ É necessário primeiro calcular a evapotranspiração pelo modelo para todos os espécimes.")
 
 # ---------------------------------------------------------------
-# 9. Seção Explicativa Expandida com Fórmulas e Interpretações
+# 10. Exibição do Histórico e Gráfico na Segunda Coluna
+# ---------------------------------------------------------------
+col1, col2 = st.columns(2)
+with col2:
+    st.header("📋 Histórico de Resultados e Gráfico")
+    if st.session_state.historico:
+        # Criar DataFrame a partir do histórico
+        data = {'Espécime': [], 'Evapotranspiração (litros/dia)': []}
+        for rec in st.session_state.historico:
+            data['Espécime'].append(rec[0])
+            data['Evapotranspiração (litros/dia)'].append(rec[1])
+        df_hist = pd.DataFrame(data)
+        st.dataframe(df_hist)
+        st.line_chart(df_hist.set_index('Espécime')['Evapotranspiração (litros/dia)'])
+    else:
+        st.write("Nenhum cálculo realizado ainda.")
+
+# ---------------------------------------------------------------
+# 11. Seção Explicativa Expandida com Fórmulas e Interpretações
 # ---------------------------------------------------------------
 with st.expander("🔍 Explicação Técnica e Interpretação Detalhada"):
     st.markdown("### 📚 Cálculos e Fórmulas")
@@ -348,7 +365,7 @@ with st.expander("🔍 Explicação Técnica e Interpretação Detalhada"):
 
     ## 🛠️ Melhores Práticas Finais
     - **Validar dados de entrada:** ex. altura entre 0,5m e 100m, diâmetro em faixas plausíveis, etc.
-    - **Incorporar dados climáticos:** (temperatura, umidade, radiação solar) para melhorar a precisão do modelo de evapotranspiração.
-    - **Utilizar modelos avançados:** como **CNNs**, treinados com dados reais para estimar a evapotranspiração.
-    - **Fornecer múltiplas medições:** para cada espécime em diferentes condições para aumentar a robustez da contraprova.
+    - **Incorporar dados climáticos:** temperatura, umidade, radiação solar para maior precisão.
+    - **Utilizar modelos avançados:** como CNNs treinadas com dados reais para estimar evapotranspiração.
+    - **Fornecer múltiplas medições:** para cada espécime em diferentes condições para robustez.
     """)
