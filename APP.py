@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 import numpy as np
+import scipy.stats as stats
 
 # Função para calcular a área foliar total
 def calculate_area_foliar_total(folhas_data, galhos):
@@ -87,7 +88,7 @@ if st.button("Calcular Evapotranspiração"):
                 lai = float(lai)
                 
                 # Simulação de previsão com base no modelo
-                evapotranspiracao = predict_evapotranspiration(image, altura, diametro, copa, lai)
+                evapotranspiracao = predict_evopotranspiration(image, altura, diametro, copa, lai)
                 resultados.append(f"Espécime {i + 1}: {evapotranspiracao} litros/dia")
             
             # Exibe os resultados
@@ -114,6 +115,17 @@ if st.button("Comparar com a Contraprova"):
                 valor_modelo = float(resultado.split(":")[1].split("litros/dia")[0].strip())
                 diferenca = abs(valor_modelo - evapotranspiracao_experimental)
                 st.write(f"Espécime {i + 1}: Diferença entre modelo e contraprova: {diferenca:.2f} litros/dia")
+                
+                # Teste de hipótese
+                alpha = 0.05
+                t_stat, p_value = stats.ttest_1samp([valor_modelo], evapotranspiracao_experimental)
+                st.write(f"Teste-t para Espécime {i + 1}:")
+                st.write(f"T-estatística: {t_stat:.2f}, P-valor: {p_value:.4f}")
+                
+                if p_value < alpha:
+                    st.write("A diferença é estatisticamente significativa.")
+                else:
+                    st.write("A diferença não é estatisticamente significativa.")
         else:
             st.warning("Calcule a evapotranspiração pelo modelo antes de comparar.")
     except ValueError:
