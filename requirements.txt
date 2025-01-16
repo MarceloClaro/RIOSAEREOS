@@ -1,1 +1,7 @@
-scipy
+streamlit 
+pillow 
+numpy 
+scipy 
+pandas 
+matplotlib
+
