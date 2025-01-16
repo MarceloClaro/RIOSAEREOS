@@ -152,6 +152,7 @@ with st.expander("🔍 Explicação Técnica e Interpretação Detalhada"):
     [0.5 \times \text{Altura (m)} + 0.3 \times \text{Diâmetro (cm)} 
     + 0.1 \times \text{Área de Copa (m²)} + 0.2 \times \text{LAI}] \times 10
     ''')
+    
     st.markdown("""
     ## Testes Estatísticos
     - **Teste t de Student:** Compara a média de um conjunto de dados com um valor hipotético.
