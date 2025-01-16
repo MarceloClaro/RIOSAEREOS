@@ -123,25 +123,19 @@ if st.button("Comparar com a Contraprova"):
 with st.expander("Explicação Técnica"):
     st.markdown("""
     ### Explicação Técnica dos Cálculos
-
-    #### Cálculo da Área Foliar Total
-    A área foliar total é calculada com base nas dimensões das folhas e no número de galhos. Para cada galho, a área de cada folha é calculada multiplicando a largura pela comprimento. Em seguida, essa área é multiplicada pelo número de galhos:
-
-    \[
-    \text{Área Foliar Total} = \sum_{i=1}^{n} (\text{Largura}_i \times \text{Comprimento}_i) \times \text{Número de Galhos}
-    \]
-
-    #### Cálculo do Índice de Área Foliar (LAI)
-    O Índice de Área Foliar (LAI) é calculado dividindo a área foliar total pela área da copa:
-
-    \[
-    \text{LAI} = \frac{\text{Área Foliar Total}}{\text{Área da Copa}}
-    \]
-
-    #### Previsão de Evapotranspiração
-    A evapotranspiração é simulada usando uma fórmula que considera a altura da planta, o diâmetro do tronco, a área da copa e o LAI. A fórmula utilizada é:
-
-    \[
-    \text{Evapotranspiração} = (0.5 \times \text{Altura}) + (0.3 \times \text{Diâmetro}) + (0.1 \times \text{Área da Copa}) + (0.2 \times \text{LAI})
-    \]
     """)
+
+    # Cálculo da Área Foliar Total
+    st.latex(r'''
+    \text{Área Foliar Total} = \sum_{i=1}^{n} (\text{Largura}_i \times \text{Comprimento}_i) \times \text{Número de Galhos}
+    ''')
+
+    # Cálculo do Índice de Área Foliar (LAI)
+    st.latex(r'''
+    \text{LAI} = \frac{\text{Área Foliar Total}}{\text{Área da Copa}}
+    ''')
+
+    # Previsão de Evapotranspiração
+    st.latex(r'''
+    \text{Evapotranspiração} = (0.5 \times \text{Altura}) + (0.3 \times \text{Diâmetro}) + (0.1 \times \text{Área da Copa}) + (0.2 \times \text{LAI})
+    ''')
