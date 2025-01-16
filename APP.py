@@ -2,15 +2,15 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import scipy.stats as stats
-import pandas as pd  # Import para trabalhar com DataFrame
+import pandas as pd  # Para DataFrame e gráficos
 
 # ---------------------------------------------------------------
 # 1. Armazenamento em session_state para persistência
 # ---------------------------------------------------------------
 if "resultados" not in st.session_state:
-    st.session_state.resultados = []  # Lista de evapotranspirações calculadas
+    st.session_state.resultados = []
 if "historico" not in st.session_state:
-    st.session_state.historico = []  # Histórico de resultados como lista de tuplas (Espécime, Valor)
+    st.session_state.historico = []
 if "uploaded_image" not in st.session_state:
     st.session_state.uploaded_image = None
 
@@ -31,6 +31,8 @@ def calculate_area_foliar_total(folhas_data, galhos):
 def calculate_lai(area_foliar_total, area_copa):
     try:
         area_copa_val = float(area_copa)
+        if area_copa_val <= 0:
+            return 0.0
         lai = area_foliar_total / area_copa_val
         return round(lai, 2)
     except (ZeroDivisionError, ValueError):
@@ -51,26 +53,29 @@ st.title("🌱 Estimativa de Evapotranspiração por CNN (Versão Ajustada)")
 st.header("1) Carregar Imagem da Espécie Arbórea ou Arbustiva")
 uploaded_file = st.file_uploader("📷 Faça o upload da imagem (formato JPG/PNG)", type=["jpg", "png"])
 if uploaded_file is not None:
-    st.session_state.uploaded_image = Image.open(uploaded_file)
-    st.image(st.session_state.uploaded_image, caption="Imagem Carregada", use_container_width=True)
+    try:
+        st.session_state.uploaded_image = Image.open(uploaded_file)
+        st.image(st.session_state.uploaded_image, caption="Imagem Carregada", use_column_width=True)
+    except Exception as e:
+        st.error(f"⚠️ Erro ao carregar a imagem: {e}")
 
 # ---------------------------------------------------------------
 # 5. Dados dos espécimes
 # ---------------------------------------------------------------
 st.header("2) Insira as Variáveis Físicas dos Espécimes")
-num_especies = st.number_input("Quantidade de Espécimes:", min_value=1, step=1, value=1)
+num_especies = st.number_input("🔢 Quantidade de Espécimes:", min_value=1, step=1, value=1)
 especies_data = []
 for i in range(num_especies):
-    st.subheader(f"Espécime {i+1}")
-    altura = st.text_input(f"Altura (m) - Espécime {i+1}:", "0")
-    diametro = st.text_input(f"Diâmetro do Tronco (cm) - Espécime {i+1}:", "0")
-    copa = st.text_input(f"Área da Copa (m²) - Espécime {i+1}:", "0")
-    galhos = st.number_input(f"Quantidade de Galhos - Espécime {i+1}:", min_value=1, step=1, value=1)
+    st.subheader(f"🌿 Espécime {i+1}")
+    altura = st.text_input(f"📏 Altura (m) - Espécime {i+1}:", "0")
+    diametro = st.text_input(f"📐 Diâmetro do Tronco (cm) - Espécime {i+1}:", "0")
+    copa = st.text_input(f"🌳 Área da Copa (m²) - Espécime {i+1}:", "0")
+    galhos = st.number_input(f"🌿 Quantidade de Galhos - Espécime {i+1}:", min_value=1, step=1, value=1)
     folhas_data = []
     for j in range(galhos):
-        st.markdown(f"**Galho {j+1}** - Espécime {i+1}")
-        largura_folha = st.text_input(f"Largura da Folha (cm) - Galho {j+1} - Espécime {i+1}:", "0")
-        comprimento_folha = st.text_input(f"Comprimento da Folha (cm) - Galho {j+1} - Espécime {i+1}:", "0")
+        st.markdown(f"**🌱 Galho {j+1} - Espécime {i+1}**")
+        largura_folha = st.text_input(f"Largura da Folha (cm) - Galho {j+1}:", "0")
+        comprimento_folha = st.text_input(f"Comprimento da Folha (cm) - Galho {j+1}:", "0")
         folhas_data.append((largura_folha, comprimento_folha))
     especies_data.append((altura, diametro, copa, galhos, folhas_data))
 
@@ -112,8 +117,10 @@ if st.button("💧 Calcular Evapotranspiração"):
 
                 **Interpretação:** A evapotranspiração estimada indica a quantidade de água que é liberada pelas folhas do espécime para a atmosfera por dia, em litros. Se o valor for muito alto ou muito baixo em comparação com os outros espécimes, pode indicar a necessidade de ajustar os parâmetros do modelo ou os dados de entrada.
                 """)
+
                 # Adicionar ao histórico como tupla (Espécime, Valor)
                 st.session_state.historico.append((i+1, et_val))
+
             except ValueError:
                 st.error(f"⚠️ Espécime {i+1}: Insira valores numéricos válidos.")
                 break
@@ -122,23 +129,23 @@ if st.button("💧 Calcular Evapotranspiração"):
 # 7. Contraprova Experimental
 # ---------------------------------------------------------------
 st.header("4) Contraprova Experimental com Múltiplas Medições")
-num_experimentos = st.number_input("Quantidade de medições experimentais para cada Espécime:", min_value=1, step=1, value=1)
+num_experimentos = st.number_input("🔢 Quantidade de medições experimentais para cada Espécime:", min_value=1, step=1, value=1)
 contraprovas = {}
 for i in range(num_especies):
-    st.subheader(f"Espécime {i+1} - Valores Experimentais (mL)")
+    st.subheader(f"🌿 Espécime {i+1} - Valores Experimentais (mL)")
     valores_experimentais = []
     for j in range(num_experimentos):
         val = st.text_input(f"Medição {j+1} (mL) - Espécime {i+1}:", "0")
         valores_experimentais.append(val)
     contraprovas[i] = valores_experimentais
-tempo_coleta_horas = st.number_input("Tempo (horas) de coleta para cada medição:", min_value=1, step=1, value=24)
+tempo_coleta_horas = st.number_input("⏱️ Tempo (horas) de coleta para cada medição:", min_value=1, step=1, value=24)
 
 # ---------------------------------------------------------------
 # 8. Escolha do Teste Estatístico e Comparação
 # ---------------------------------------------------------------
 st.header("5) Escolha o Teste Estatístico")
 test_type = st.selectbox(
-    "Escolha o teste estatístico para comparação:",
+    "📊 Escolha o teste estatístico para comparação:",
     ("Teste t de Student (1 amostra)",
      "Teste de Mann-Whitney",
      "Teste de Wilcoxon",
@@ -149,8 +156,9 @@ test_type = st.selectbox(
 if st.button("🔄 Comparar com a Contraprova"):
     if len(st.session_state.resultados) == num_especies:
         for i in range(num_especies):
-            st.markdown(f"---\n**Espécime {i+1}:**")
+            st.markdown(f"---\n**🌿 Espécime {i+1}:**")
             try:
+                # Converter valores experimentais para float
                 valores_exp_float = [float(x) for x in contraprovas[i]]
                 evap_exps = []
                 for vol_mL in valores_exp_float:
@@ -213,6 +221,7 @@ if st.button("🔄 Comparar com a Contraprova"):
                         """)
 
                     elif test_type == "Teste de Mann-Whitney":
+                        # Comparando com uma distribuição constante (et_modelo)
                         stat, p_value = stats.mannwhitneyu(evap_exps, [et_modelo]*len(evap_exps), alternative='two-sided')
                         st.write(f"📉 **Estatística U:** {stat:.4f}")
                         st.write("""
@@ -252,8 +261,8 @@ if st.button("🔄 Comparar com a Contraprova"):
                                 **Explicação:** O P-valor determina se a diferença observada nas medições pareadas é significativa.
 
                                 **Interpretação:** 
-                                - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula.
-                                - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa.
+                                - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula de que não há diferença nas medianas das amostras pareadas.
+                                - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa. Não rejeitamos a hipótese nula.
                                 """)
                             except Exception as e:
                                 st.error(f"⚠️ Erro no teste de Wilcoxon: {e}")
@@ -300,23 +309,22 @@ if st.button("🔄 Comparar com a Contraprova"):
                     if p_value is not None:
                         alpha = 0.05
                         if p_value < alpha:
-                            st.error("❌ Diferença estatisticamente significativa (p < 0.05).")
+                            st.error("❌ **Diferença estatisticamente significativa (p < 0.05).**")
                             st.write("""
                             **Interpretação:** A diferença entre o modelo e as medições é significativa. O modelo pode precisar de ajustes.
                             """)
                         else:
-                            st.info("✅ Diferença não é estatisticamente significativa (p ≥ 0.05).")
+                            st.info("✅ **Diferença não é estatisticamente significativa (p ≥ 0.05).**")
                             st.write("""
                             **Interpretação:** Não há diferença significativa entre o modelo e as medições. O modelo parece adequado.
                             """)
-
             except ValueError:
                 st.error(f"⚠️ Espécime {i+1}: Insira valores experimentais válidos (números).")
     else:
         st.warning("⚠️ É necessário primeiro calcular a evapotranspiração pelo modelo para todos os espécimes.")
 
 # ---------------------------------------------------------------
-# 10. Exibição do Histórico e Gráfico na Segunda Coluna
+# 9. Exibição do Histórico e Gráfico na Segunda Coluna
 # ---------------------------------------------------------------
 col1, col2 = st.columns(2)
 with col2:
@@ -332,6 +340,20 @@ with col2:
         st.line_chart(df_hist.set_index('Espécime')['Evapotranspiração (litros/dia)'])
     else:
         st.write("Nenhum cálculo realizado ainda.")
+
+# ---------------------------------------------------------------
+# 10. Histórico e Limpeza do Histórico na Sidebar
+# ---------------------------------------------------------------
+st.sidebar.header("🔄 Histórico de Cálculos")
+if st.session_state.historico:
+    for record in st.session_state.historico:
+        st.sidebar.write(f"🌿 Espécime {record[0]}: {record[1]} litros/dia")
+else:
+    st.sidebar.write("Nenhum cálculo realizado ainda.")
+
+if st.sidebar.button("🧹 Limpar Histórico"):
+    st.session_state.historico.clear()
+    st.sidebar.write("✅ Histórico limpo!")
 
 # ---------------------------------------------------------------
 # 11. Seção Explicativa Expandida com Fórmulas e Interpretações
@@ -364,8 +386,61 @@ with st.expander("🔍 Explicação Técnica e Interpretação Detalhada"):
     no tamanho da amostra, distribuição dos dados e tipo de hipótese a ser testada.
 
     ## 🛠️ Melhores Práticas Finais
-    - **Validar dados de entrada:** ex. altura entre 0,5m e 100m, diâmetro em faixas plausíveis, etc.
-    - **Incorporar dados climáticos:** temperatura, umidade, radiação solar para maior precisão.
-    - **Utilizar modelos avançados:** como CNNs treinadas com dados reais para estimar evapotranspiração.
-    - **Fornecer múltiplas medições:** para cada espécime em diferentes condições para robustez.
+    - **Validar dados de entrada:** Ex.: altura entre 0,5m e 100m, diâmetro em faixas plausíveis, etc.
+    - **Incorporar dados climáticos:** Temperatura, umidade, radiação solar para maior precisão.
+    - **Utilizar modelos avançados:** Como **CNNs**, treinados com dados reais para estimar evapotranspiração.
+    - **Fornecer múltiplas medições:** Para cada espécime em diferentes condições para robustez.
     """)
+
+# ---------------------------------------------------------------
+# 12. Avaliação Prática Máxima
+# ---------------------------------------------------------------
+st.header("6) Avaliação Prática Máxima")
+
+st.markdown("""
+Após realizar os cálculos e análises estatísticas, é importante validar os resultados obtidos para garantir a precisão e confiabilidade do modelo de evapotranspiração.
+
+### 📝 Passos para Avaliação Prática:
+1. **Comparação com Dados Reais:**
+   - Compare os valores de evapotranspiração estimados com medições de campo ou dados de estudos científicos para verificar a acurácia do modelo.
+
+2. **Análise de Sensibilidade:**
+   - Avalie como alterações nas variáveis de entrada (altura, diâmetro, área da copa, LAI) afetam a evapotranspiração estimada.
+   - Identifique quais variáveis têm maior impacto no resultado final.
+
+3. **Validação Cruzada:**
+   - Utilize diferentes conjuntos de dados para treinar e testar o modelo, assegurando que ele generaliza bem para diferentes condições.
+
+4. **Incorporação de Fatores Climáticos:**
+   - Para aumentar a precisão, considere incluir variáveis climáticas como temperatura, umidade, e radiação solar no modelo de evapotranspiração.
+
+5. **Feedback de Especialistas:**
+   - Consulte especialistas em botânica ou agronomia para interpretar os resultados e fornecer insights adicionais sobre a precisão do modelo.
+
+6. **Aprimoramento Contínuo:**
+   - Utilize os resultados das validações para ajustar os coeficientes do modelo e melhorar sua precisão.
+   - Considere utilizar técnicas de aprendizado de máquina mais avançadas para refinar as estimativas.
+
+### 📈 Visualizações Adicionais:
+Para uma melhor compreensão dos resultados, você pode adicionar visualizações adicionais, como:
+- **Histograma** das evapotranspirações estimadas para identificar a distribuição dos dados.
+- **Boxplot** para comparar as medições experimentais e as estimativas do modelo.
+- **Mapa de Calor** se estiver trabalhando com múltiplas variáveis climáticas.
+
+### 🔄 Repetibilidade:
+- **Documentação:** Mantenha uma documentação clara dos passos e metodologias utilizadas.
+- **Reprodutibilidade:** Assegure que o aplicativo possa ser utilizado por outros usuários com facilidade, permitindo a reprodutibilidade das análises.
+
+### 🛡️ Confiabilidade:
+- **Validação dos Dados:** Certifique-se de que os dados de entrada são precisos e confiáveis.
+- **Tratamento de Erros:** Implemente tratamentos de erros robustos para lidar com entradas inválidas ou inconsistentes.
+
+### 📅 Atualizações Futuras:
+- **Integração com Bancos de Dados:** Armazene os resultados em um banco de dados para análises futuras e histórico persistente.
+- **Interface Melhorada:** Adicione mais funcionalidades interativas, como filtros para o histórico ou opções avançadas de visualização.
+- **Machine Learning:** Integre modelos de aprendizado de máquina para melhorar as estimativas com base em grandes conjuntos de dados.
+
+### 🚀 Conclusão:
+A avaliação prática é essencial para garantir que o modelo de evapotranspiração seja preciso e confiável. Utilize os passos e melhores práticas acima para validar e aprimorar continuamente seu aplicativo, garantindo que ele atenda às necessidades dos usuários de forma eficaz e eficiente.
+""")
+
