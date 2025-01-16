@@ -4,11 +4,10 @@ import numpy as np
 import scipy.stats as stats
 
 # ---------------------------------------------------------------
-# 1. Armazenamento em session_state
+# 1. Armazenamento em session_state para persistência
 # ---------------------------------------------------------------
-# Inicializa variáveis em session_state para persistência
 if "resultados" not in st.session_state:
-    st.session_state.resultados = []  # Lista de evapotranspirações calculadas
+    st.session_state.resultados = []  # Evapotranspirações (modelo)
 if "uploaded_image" not in st.session_state:
     st.session_state.uploaded_image = None
 
@@ -19,18 +18,6 @@ def calculate_area_foliar_total(folhas_data, galhos):
     """
     Calcula a área foliar total com base nas dimensões (largura x comprimento)
     de cada folha e no número de galhos do espécime.
-
-    Parâmetros:
-    -----------
-    folhas_data : list of tuples
-        Lista de tuplas (largura_str, comprimento_str) para cada galho.
-    galhos : int
-        Número de galhos do espécime.
-
-    Retorna:
-    --------
-    float
-        Área foliar total.
     """
     total_area = 0.0
     for largura_str, comprimento_str in folhas_data:
@@ -39,26 +26,14 @@ def calculate_area_foliar_total(folhas_data, galhos):
             comprimento = float(comprimento_str)
             total_area += (largura * comprimento) * galhos
         except ValueError:
-            # Se algum valor não puder ser convertido, ignoramos a folha.
+            # Se houver erro na conversão, ignora aquela folha
             continue
     return total_area
 
 def calculate_lai(area_foliar_total, area_copa):
     """
     Calcula o LAI (Leaf Area Index) = Área Foliar Total / Área da Copa.
-
-    Parâmetros:
-    -----------
-    area_foliar_total : float
-        Área foliar total.
-    area_copa : float
-        Área da copa (m²).
-
-    Retorna:
-    --------
-    float
-        Valor do LAI (arredondado em 2 casas decimais).
-        Retorna 0.0 se ocorrer zero division ou erro de conversão.
+    Retorna 0.0 em caso de erro ou divisão por zero.
     """
     try:
         area_copa_val = float(area_copa)
@@ -70,34 +45,13 @@ def calculate_lai(area_foliar_total, area_copa):
 def predict_evapotranspiration(image, altura, diametro, copa, lai):
     """
     Simula a previsão de evapotranspiração (litros/dia) usando coeficientes
-    ilustrativos. A imagem é recebida como parâmetro apenas para fins
-    de compatibilidade com um hipotético modelo de CNN.
-
-    Parâmetros:
-    -----------
-    image : PIL.Image
-        Imagem da espécie (não usada diretamente aqui).
-    altura : float
-        Altura do espécime (em metros).
-    diametro : float
-        Diâmetro do tronco (em centímetros).
-    copa : float
-        Área da copa (em m²).
-    lai : float
-        Índice de área foliar (sem unidade).
-
-    Retorna:
-    --------
-    float
-        Evapotranspiração simulada, em litros/dia.
+    ilustrativos. A imagem pode futuramente ser usada em um modelo de CNN real.
     """
-    # Exemplo de fórmula (coeficientes são fictícios):
-    # Evapotranspiração = (0.5*altura + 0.3*diametro + 0.1*copa + 0.2*lai)*10
     et = (altura * 0.5 + diametro * 0.3 + copa * 0.1 + lai * 0.2) * 10
     return round(et, 2)
 
 # ---------------------------------------------------------------
-# 3. Cabeçalho e título do app
+# 3. Cabeçalho e título
 # ---------------------------------------------------------------
 st.title("Estimativa de Evapotranspiração por CNN (Versão Ajustada)")
 
@@ -108,20 +62,18 @@ st.header("1) Carregar Imagem da Espécie Arbórea ou Arbustiva")
 
 uploaded_file = st.file_uploader("Faça o upload da imagem (formato JPG/PNG)", type=["jpg", "png"])
 if uploaded_file is not None:
-    # Armazena a imagem em session_state para persistir
     st.session_state.uploaded_image = Image.open(uploaded_file)
     st.image(st.session_state.uploaded_image, caption="Imagem Carregada", use_container_width=True)
 
 # ---------------------------------------------------------------
-# 5. Entrada de dados dos espécimes
+# 5. Dados dos espécimes
 # ---------------------------------------------------------------
 st.header("2) Insira as Variáveis Físicas dos Espécimes")
 
 num_especies = st.number_input("Quantidade de Espécimes:", min_value=1, step=1, value=1)
 
-# Lista temporária para coletar informações de cada espécime
+# Lista para armazenar dados temporariamente
 especies_data = []
-
 for i in range(num_especies):
     st.subheader(f"Espécime {i+1}")
     altura = st.text_input(f"Altura (m) - Espécime {i+1}:", "0")
@@ -136,34 +88,33 @@ for i in range(num_especies):
         comprimento_folha = st.text_input(f"Comprimento da Folha (cm) - Galho {j+1} - Espécime {i+1}:", "0")
         folhas_data.append((largura_folha, comprimento_folha))
 
-    # Armazena as informações para processamento posterior
     especies_data.append((altura, diametro, copa, galhos, folhas_data))
 
 # ---------------------------------------------------------------
-# 6. Botão para calcular evapotranspiração do modelo
+# 6. Botão: Calcular evapotranspiração (modelo)
 # ---------------------------------------------------------------
 st.header("3) Cálculo da Evapotranspiração (Modelo)")
 
 if st.button("Calcular Evapotranspiração"):
-    # Zera a lista de resultados para recalcular
+    # Zera lista de resultados para recalcular
     st.session_state.resultados = []
 
     # Verifica se há imagem carregada
     if st.session_state.uploaded_image is None:
         st.error("É necessário carregar uma imagem antes de calcular.")
     else:
-        # Para cada espécime
+        # Calcula para cada espécime
         for i, (altura_str, diametro_str, copa_str, galhos, folhas_data) in enumerate(especies_data):
             try:
                 altura_val = float(altura_str)
                 diametro_val = float(diametro_str)
                 copa_val = float(copa_str)
 
-                # Cálculo da área foliar total
+                # Área foliar total
                 aft = calculate_area_foliar_total(folhas_data, galhos)
-                # Cálculo do LAI
+                # LAI
                 lai_val = calculate_lai(aft, copa_val)
-                # Evapotranspiração do modelo
+                # Modelo
                 et_val = predict_evapotranspiration(
                     st.session_state.uploaded_image,
                     altura_val,
@@ -177,11 +128,11 @@ if st.button("Calcular Evapotranspiração"):
 
             except ValueError:
                 st.error(f"Espécime {i+1}: Por favor, insira valores numéricos válidos.")
-                # Se der erro, interrompe a execução do laço
+                # Se der erro, interrompe
                 break
 
 # ---------------------------------------------------------------
-# 7. Contraprova Experimental (múltiplas medições)
+# 7. Contraprova Experimental
 # ---------------------------------------------------------------
 st.header("4) Contraprova Experimental com Múltiplas Medições")
 
@@ -190,7 +141,6 @@ num_experimentos = st.number_input(
     min_value=1, step=1, value=1
 )
 
-# Coleta dos valores experimentais (em mL)
 contraprovas = {}
 for i in range(num_especies):
     st.subheader(f"Espécime {i+1} - Valores Experimentais (mL)")
@@ -202,23 +152,24 @@ for i in range(num_especies):
 
 tempo_coleta_horas = st.number_input("Tempo (horas) de coleta para cada medição:", min_value=1, step=1, value=24)
 
-# Botão para comparar com a contraprova
 if st.button("Comparar com a Contraprova"):
+    # Verifica se temos resultados para todos os espécimes
     if len(st.session_state.resultados) == num_especies:
-        # Para cada espécime, faz o teste t de Student (1 amostra)
+        # Para cada espécime
         for i in range(num_especies):
             st.markdown(f"---\n**Espécime {i+1}:**")
 
             try:
                 # Converte strings para float
                 valores_exp_float = [float(x) for x in contraprovas[i]]
-                # Converte mL -> litros e ajusta para 24h (litros/dia)
+                # Converte mL -> L e ajusta para 24h (litros/dia)
                 evap_exps = []
                 for vol_mL in valores_exp_float:
-                    vol_L = vol_mL / 1000.0  # mL para litros
+                    vol_L = vol_mL / 1000.0
                     vol_L_dia = vol_L / (tempo_coleta_horas / 24.0)
                     evap_exps.append(vol_L_dia)
 
+                # Exibe medições convertidas
                 st.write("Medições (litros/dia):", [f"{v:.2f}" for v in evap_exps])
 
                 media_experimental = np.mean(evap_exps)
@@ -227,18 +178,25 @@ if st.button("Comparar com a Contraprova"):
                 st.write(f"Média experimental: {media_experimental:.2f} litros/dia")
                 st.write(f"Valor previsto pelo modelo: {et_modelo:.2f} litros/dia")
 
-                # Teste t: comparando a lista evap_exps com a média do modelo
-                t_stat, p_value = stats.ttest_1samp(evap_exps, et_modelo)
-
-                st.write(f"T-estatística: {t_stat}")
-                st.write(f"P-valor: {p_value}")
-
-                alpha = 0.05
-                # Verifica se resultado é numérico ou NaN
-                if np.isnan(t_stat) or np.isnan(p_value):
-                    st.warning("T-estatística ou P-valor retornaram 'NaN' — veja explicação técnica!")
+                # Verifica se há pelo menos 2 valores diferentes
+                valores_unicos = set(evap_exps)
+                if len(evap_exps) < 2 or len(valores_unicos) < 2:
+                    # Se há apenas 1 medição ou todas medições iguais
+                    st.warning(
+                        "Não é possível realizar o teste t com uma única medição ou valores idênticos. "
+                        "O teste exige pelo menos 2 valores distintos."
+                    )
+                    # Como alternativa, exibimos a diferença absoluta:
+                    diferenca_abs = abs(media_experimental - et_modelo)
+                    st.write(f"Diferença (modelo x experimento): {diferenca_abs:.2f} litros/dia")
                 else:
-                    # Interpretação do resultado
+                    # Pode fazer o teste t normalmente
+                    t_stat, p_value = stats.ttest_1samp(evap_exps, et_modelo)
+
+                    st.write(f"T-estatística: {t_stat:.4f}")
+                    st.write(f"P-valor: {p_value:.6f}")
+
+                    alpha = 0.05
                     if p_value < alpha:
                         st.error("Diferença estatisticamente significativa (p < 0.05).")
                     else:
@@ -251,31 +209,27 @@ if st.button("Comparar com a Contraprova"):
         st.warning("É necessário primeiro calcular a evapotranspiração pelo modelo para todos os espécimes.")
 
 # ---------------------------------------------------------------
-# 8. Seção Explicativa (expandida)
+# 8. Seção Explicativa Expandida
 # ---------------------------------------------------------------
 with st.expander("Explicação Técnica e Interpretação Detalhada"):
     st.markdown("""
-    ## 1) Cálculo da Área Foliar Total (AFT)
-    A **Área Foliar Total (AFT)** é a soma da área de cada folha, multiplicada pelo número total de galhos do espécime.
-    Admitindo que cada folha em um galho tem a mesma dimensão (largura × comprimento), temos:
+    ## 1. Cálculo da Área Foliar Total (AFT)
+    A **Área Foliar Total** é obtida ao somar a área de cada folha 
+    (largura × comprimento) multiplicada pelo número de galhos.
     """)
     st.latex(r'''
     \text{AFT} = \sum_{i=1}^{n} (\text{largura}_i \times \text{comprimento}_i)\times \text{galhos}
     ''')
     st.markdown("""
-    - Caso haja variação entre folhas de um mesmo galho, pode-se ajustar o código para individualizar cada folha.
-
-    ## 2) Índice de Área Foliar (LAI)
-    O **LAI (Leaf Area Index)** é a razão entre a área foliar total (AFT) e a área de projeção do dossel (copa):
+    ## 2. Índice de Área Foliar (LAI)
+    O **LAI** é a razão entre a AFT e a área de projeção da copa:
     """)
     st.latex(r'''
     \text{LAI} = \frac{\text{AFT}}{\text{Área da Copa}}
     ''')
     st.markdown("""
-    - Se a área da copa for muito pequena (ou zero), teremos problemas de divisão por zero, resultando em LAI = 0.0.
-
-    ## 3) Cálculo de Evapotranspiração (Modelo)
-    Usamos coeficientes **exemplificativos**:
+    ## 3. Evapotranspiração (Modelo)
+    Exemplo de equação (coeficientes ilustrativos):
     """)
     st.latex(r'''
     \text{ET (litros/dia)} = 
@@ -283,36 +237,31 @@ with st.expander("Explicação Técnica e Interpretação Detalhada"):
     + 0.1 \times \text{Área de Copa (m²)} + 0.2 \times \text{LAI}] \times 10
     ''')
     st.markdown("""
-    > **Obs.:** Ajuste esses coeficientes segundo o seu **modelo real** ou conforme experimentos validados.
+    Ajuste os coeficientes conforme o seu modelo real ou estudo específico.
 
-    ## 4) Contraprova Experimental
-    - **Coleta de água** (mL) em certo intervalo (horas).
-    - Conversão de mL para litros (dividir por 1000).
-    - Ajuste para 24h: multiplica (ou divide) considerando `tempo_coleta_horas`.  
-      Ex.: `litros_dia = (vol_mL / 1000) / (tempo_coleta_horas / 24)`
+    ## 4. Contraprova Experimental
+    - O volume coletado (mL) é convertido para litros (dividindo por 1000).
+    - Ajustamos para 24 horas, dividindo pela razão (tempo_coleta_horas / 24).
 
-    ## 5) Teste de Hipótese (Teste t de Student - 1 amostra)
-    - **Hipótese Nula (H0):** a média experimental **não** difere do valor previsto pelo modelo.
-    - **Hipótese Alternativa (H1):** a média experimental **difere** significativamente do valor previsto.
-    - Estatística do teste (t) e p-valor:
-      - Se `p_value < α` (ex.: 0.05), **rejeitamos** H0.
-      - Caso contrário, **não rejeitamos** H0.
+    ## 5. Teste de Hipótese (Teste t de Student - 1 amostra)
+    - **Hipótese nula (H0):** A média experimental é igual ao valor do modelo.
+    - **Hipótese alternativa (H1):** A média experimental difere do valor do modelo.
+    - Se p-valor < 0.05 (nível de significância α): rejeita-se H0, indicando diferença significativa.
 
-    ### Caso T-estatística: NaN e P-valor: NaN
-    Se o teste t retornar valores `NaN`, isso ocorre principalmente por:
-    1. **Amostra com tamanho 1 ou 0** – Não há variabilidade suficiente para o teste t.
-    2. **Todos os valores experimentais são idênticos** – A variância é zero, resultando em divisão por zero no cálculo.
-    3. **Valores inválidos** – Se houver `inf` ou já for `NaN` em alguma medição.
-    
-    > Quando `NaN` ocorre, significa que **não** há como calcular a significância estatística com esse conjunto de dados.  
-    > Soluções possíveis:  
-    > - Coletar mais medições (para ter pelo menos 2 ou mais valores diferentes).  
-    > - Verificar se o tipo de teste usado é adequado, ou se é preciso outro teste estatístico.
+    ### Por que T-estatística e P-valor podem ser NaN?
+    - Se houver **apenas 1 medição** ou **todas medições forem idênticas**, a variância é zero, impossibilitando o cálculo do teste t.
+    - Nesse caso, exibimos uma mensagem indicando ser inviável realizar estatística inferencial com apenas 1 valor 
+      (ou valores iguais).
 
-    ## 6) Potenciais Melhores Práticas
-    - Incorporar dados climáticos (umidade, radiação solar, temperatura) para um modelo de evapotranspiração mais acurado.
-    - Ajustar ou substituir a fórmula atual por um **modelo baseado em CNN** (Rede Neural Convolucional) devidamente treinado.
-    - Validar intervalos de valores (ex.: altura entre 0,5m e 100m, etc.) para evitar inputs irreais.
-    - Fornecer **múltiplas medições** para cada espécime ao longo de diferentes dias/horas, melhorando a robustez da contraprova.
+    ## 6. Diferença Absoluta
+    Quando não é possível fazer o teste t (poucos valores), exibimos a diferença absoluta 
+    entre a média experimental e o modelo (litros/dia). Esse número **não** indica significância estatística, 
+    mas pelo menos informa quão distante está o valor medido do previsto.
+
+    ## 7. Boas Práticas Finais
+    - Coletar 2 ou mais medições **em diferentes condições** para estimar a variabilidade da contraprova.
+    - Validar as variáveis (altura, diâmetro, etc.) dentro de faixas plausíveis para evitar inputs irreais.
+    - Considerar dados climáticos (umidade, radiação, temperatura) para maior realismo.
+    - Se desejar usar CNN real, treine um modelo usando imagens + variáveis para prever evapotranspiração.
     """)
 
