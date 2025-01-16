@@ -89,6 +89,8 @@ if st.button("Calcular Evapotranspiração"):
                 # Validação simples de intervalos (exemplo)
                 if not (0.5 <= altura_val <= 100):
                     st.warning(f"Altura do Espécime {i+1} fora do intervalo plausível (0,5m - 100m).")
+                else:
+                    st.success(f"Altura do Espécime {i+1} está dentro do intervalo plausível.")
 
                 aft = calculate_area_foliar_total(folhas_data, galhos)
                 lai_val = calculate_lai(aft, copa_val)
@@ -155,7 +157,8 @@ if st.button("Comparar com a Contraprova"):
                 if len(evap_exps) < 2 or len(valores_unicos) < 2:
                     st.warning(
                         "Não é possível realizar o teste com uma única medição ou valores idênticos. "
-                        "O teste exige pelo menos 2 valores distintos."
+                        "O teste exige pelo menos 2 valores distintos.\n"
+                        "Recomenda-se coletar mais medições em diferentes condições para análises mais robustas."
                     )
                     diferenca_abs = abs(media_experimental - et_modelo)
                     st.write(f"Diferença (modelo x experimento): {diferenca_abs:.2f} litros/dia")
@@ -174,7 +177,8 @@ if st.button("Comparar com a Contraprova"):
                     elif test_type == "Teste de Wilcoxon":
                         differences = np.array(evap_exps) - et_modelo
                         if np.all(differences == 0):
-                            st.warning("Diferenças nulas impossibilitam o teste Wilcoxon.")
+                            st.warning("Diferenças nulas impossibilitam o teste Wilcoxon.\n"
+                                       "Isso ocorre quando todas as medições são idênticas ao valor do modelo.")
                         else:
                             try:
                                 stat, p_value = stats.wilcoxon(differences)
@@ -188,7 +192,8 @@ if st.button("Comparar com a Contraprova"):
                         nonzero_diff = differences[differences != 0]
                         n = len(nonzero_diff)
                         if n == 0:
-                            st.warning("Todos os valores experimentais são iguais ao valor do modelo.")
+                            st.warning("Todos os valores experimentais são iguais ao valor do modelo.\n"
+                                       "O teste de Sinal não pode ser aplicado quando todas as diferenças são nulas.")
                         else:
                             pos = np.sum(nonzero_diff > 0)
                             res = stats.binomtest(pos, n, 0.5)
