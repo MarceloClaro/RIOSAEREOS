@@ -248,7 +248,7 @@ if st.button("🔄 Comparar com a Contraprova"):
                     if test_type == "Teste t de Student (1 amostra)":
                         # Assuming evap_exps represents a sample from a population with mean et_modelo under the null
                         try:
-                            stat, p_value = stats.ttest_1samp(evap_exps, et_modelo) # Corrected Indentation
+                            stat, p_value = stats.ttest_1samp(evap_exps, et_modelo)
                             st.write(f"📈 **T-estatística (Teste t de 1 Amostra):** {stat:.4f}")
                             st.write("""
                             **Explicação:** A T-estatística quantifica a diferença entre a média da amostra experimental (as medições coletadas para este espécime) e o valor hipotético (a previsão do modelo para este espécime), normalizada pela variabilidade estimada da amostra.
@@ -259,7 +259,7 @@ if st.button("🔄 Comparar com a Contraprova"):
                             st.write("""
                             **Explicação:** O P-valor é a probabilidade de observar uma T-estatística tão extrema (ou mais) quanto a calculada, *se* a evapotranspiração verdadeira do espécime for igual ao valor previsto pelo modelo (hipótese nula).
     
-                            **Interpretação:**
+                            **Interpretação:** 
                             - **Se p < alpha (geralmente 0.05):** Rejeitamos a hipótese nula. Há evidência estatística de que a média experimental é significativamente diferente do valor previsto pelo modelo.
                             - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula. A diferença observada pode ser devida ao acaso amostral.
                         """)
@@ -279,7 +279,7 @@ if st.button("🔄 Comparar com a Contraprova"):
                             # Create a synthetic sample of the model prediction for comparison
                             model_sample = [et_modelo] * len(evap_exps)
                             stat, p_value = stats.mannwhitneyu(evap_exps, model_sample, alternative='two-sided')
-                            st.write(f"📉 **Estatística U (Teste de Mann-Whitney adaptado):** {stat:.4f}") # Corrected Indentation
+                            st.write(f"📉 **Estatística U (Teste de Mann-Whitney adaptado):** {stat:.4f}")
                             st.write("""
                             **Explicação:** A Estatística U mede a diferença entre as "posições relativas" dos dados experimentais comparados com o valor previsto pelo modelo. Um U baixo indica que as medições experimentais tendem a ser menores que o valor previsto, e um U alto (próximo de len(evap_exps)*len(model_sample)) indica que tendem a ser maiores.
     
@@ -289,7 +289,7 @@ if st.button("🔄 Comparar com a Contraprova"):
                             st.write("""
                             **Explicação:** O P-valor é a probabilidade de observar uma Estatística U tão extrema (ou mais) quanto a calculada, *se* as medições experimentais forem distribuídas de forma semelhante em torno do valor previsto pelo modelo.
     
-                            **Interpretação:**
+                            **Interpretação:** 
                             - **Se p < alpha:** Rejeitamos a hipótese nula (que as medianas/distribuições são semelhantes).
                             - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula.
                         """)
@@ -341,8 +341,8 @@ if st.button("🔄 Comparar com a Contraprova"):
                             # The null hypothesis is that P(positive difference) = P(negative difference) = 0.5
                             # We can use a binomial test for this.
                             try:
-                                res = stats.binomtest(pos, n, 0.5, alternative='two-sided') # Use binomial test on number of positive signs
-                                st.write(f"📊 **Número de diferenças não-nulas:** {n}") # Corrected Indentation
+                                res = stats.binomtest(pos, n, 0.5, alternative='two-sided')
+                                st.write(f"📊 **Número de diferenças não-nulas:** {n}")
                                 st.write("""
                                 **Explicação:** Este valor indica quantas das diferenças entre as medições experimentais e o valor previsto pelo modelo não são zero. O Teste de Sinal ignora as diferenças iguais a zero.
         
@@ -381,18 +381,18 @@ if st.button("🔄 Comparar com a Contraprova"):
                     if p_value is not None:
                         alpha = 0.05 # Standard significance level
                         st.markdown("---")
-                        st.subheader("Conclusão Estatística:") # This line was correctly indented
+                        st.subheader("Conclusão Estatística:")
                         if p_value is not None and p_value < alpha: # Check if p_value was set
                             st.error("❌ **Resultado Estatisticamente Significativo (p < 0.05).**")
                             st.write("""
                             **Interpretação (para este espécime):** A análise estatística indica que a diferença observada entre as medições experimentais e o valor previsto pelo modelo para este espécime **é estatisticamente significativa** ao nível de significância de 5%. Isso sugere que é improvável que a diferença observada seja apenas devido ao acaso amostral. Portanto, pode haver uma limitação no modelo em prever a evapotranspiração para este espécime sob as condições observadas, ou podem existir fatores não considerados pelo modelo que influenciam a evapotranspiração real.
                             """)
-                        elif p_value is not None: # Added elif to handle the case where p_value is not None but >= alpha
+                        elif p_value is not None:
                             st.info("✅ **Resultado Não Estatisticamente Significativo (p ≥ 0.05).**")
                             st.write("""
                             **Interpretação:** A análise estatística indica que a diferença observada entre as medições experimentais e o valor previsto pelo modelo para este espécime **não é estatisticamente significativa** ao nível de significância de 5%. Isso significa que não há evidência estatística forte para concluir que a média experimental difere do valor previsto pelo modelo. A diferença observada pode ser explicada pela variabilidade natural ou pelo acaso amostral. Isso sugere que o modelo pode ser adequado para prever a evapotranspiração para este espécime sob as condições observadas, embora a ausência de significância não prove que o modelo está "correto", apenas que os dados atuais não fornecem evidência suficiente para rejeitá-lo.
                             """)
-                        else: # This handles the case where p_value is None (e.g., test failed or not applicable)
+                        else:
                              st.info("ℹ️ Teste estatístico inferencial não aplicável ou não produziu P-valor para este espécime devido a dados insuficientes/idênticos ou erro no teste.")
 
 
