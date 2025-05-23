@@ -27,38 +27,37 @@ if "carbon_model_coeffs" not in st.session_state:
         "k_aft_carbon": 0.005, # kg C / m² AFT / dia
         "c_et_wue_carbon": 0.002 # kg C / L ET / dia (considerando uma WUE hipotética)
     }
+if "especimes_data_list" not in st.session_state: # Garantir que a lista existe
+    st.session_state.especimes_data_list = []
+if "contraprovas_data" not in st.session_state: # Para dados experimentais
+    st.session_state.contraprovas_data = {}
+
 
 # ---------------------------------------------------------------
 # 2. Funções Científicas e de Cálculo
 # ---------------------------------------------------------------
-def calculate_area_foliar_total(folhas_data_list, galhos_principais):
+def calculate_area_foliar_total(folhas_data_list, galhos_principais, num_folhas_estimado_por_galho):
     """Calcula a Área Foliar Total (AFT) em m²."""
     area_foliar_total_m2 = 0.0
-    if not folhas_data_list:
+    if not folhas_data_list or galhos_principais <= 0 or num_folhas_estimado_por_galho <=0:
         return 0.0
 
-    # Assume que folhas_data_list contém tuplas (largura_cm_str, comprimento_cm_str)
-    # Calcula a área média de uma folha de exemplo em m²
     soma_area_folhas_exemplo_m2 = 0
     num_folhas_validas = 0
     for largura_str, comprimento_str in folhas_data_list:
         try:
             largura_m = float(largura_str) / 100.0
             comprimento_m = float(comprimento_str) / 100.0
-            soma_area_folhas_exemplo_m2 += (largura_m * comprimento_m) # Área de uma folha em m²
+            soma_area_folhas_exemplo_m2 += (largura_m * comprimento_m)
             num_folhas_validas +=1
         except ValueError:
-            continue # Ignora entradas inválidas
+            st.warning(f"Valor inválido ({largura_str} ou {comprimento_str}) para dimensão de folha. Será ignorado.")
+            continue
 
     if num_folhas_validas == 0:
         return 0.0
 
     area_media_folha_m2 = soma_area_folhas_exemplo_m2 / num_folhas_validas
-
-    # Estimativa MUITO simplificada: AFT = area_media_folha * num_folhas_por_galho_principal * num_galhos_principais
-    # Para um estudo de doutorado, isso seria muito mais complexo (e.g., alometria, amostragem estratificada)
-    # Vamos assumir um número hipotético de folhas por galho principal para ilustração
-    num_folhas_estimado_por_galho = st.session_state.get(f"num_folhas_por_galho_estimado", 50) # Default, pode ser ajustado
     area_foliar_total_m2 = area_media_folha_m2 * num_folhas_estimado_por_galho * galhos_principais
     return area_foliar_total_m2
 
@@ -76,14 +75,8 @@ def calculate_lai(area_foliar_total_m2, area_copa_m2_str):
 def predict_evapotranspiration_phd(
     altura_m, diametro_cm, area_copa_m2, lai,
     temperatura_c, umidade_perc, radiacao_mj_m2_dia, vento_m_s,
-    coeffs, image_data=None # image_data não usado neste modelo, mas poderia ser em ML
+    coeffs, image_data=None
     ):
-    """
-    Prevê a Evapotranspiração (ET) em litros/dia usando um modelo linear ponderado.
-    Para um estudo de PhD, este modelo seria substituído por um biofísico (Penman-Monteith)
-    ou um modelo de Machine Learning treinado e validado.
-    Os coeficientes (coeffs) são demonstrativos e necessitariam de calibração rigorosa.
-    """
     diametro_m = diametro_cm / 100.0
     umidade_frac = umidade_perc / 100.0
 
@@ -100,29 +93,8 @@ def predict_evapotranspiration_phd(
     return round(et, 2)
 
 def estimate_carbon_absorption_phd(area_foliar_total_m2, et_litros_dia, coeffs_carbon, especie_info=None):
-    """
-    Estima a absorção de carbono (kg C/dia) de forma simplificada.
-    Para um estudo de PhD, isso envolveria modelos ecofisiológicos complexos,
-    considerando fotossíntese, respiração, alocação de biomassa, WUE específica da espécie, etc.
-    """
-    # Estimativa baseada em AFT (mais direta, mas ainda muito simplificada)
-    # k_aft_carbon: taxa média de fixação de C por m² de folha por dia. Varia enormemente.
     carbono_via_aft = area_foliar_total_m2 * coeffs_carbon["k_aft_carbon"]
-
-    # Estimativa baseada em ET e WUE (muito indireta e conceitual)
-    # c_et_wue_carbon: kg de C fixado por Litro de água transpirada.
-    # Isso é uma proxy para a Eficiência no Uso da Água (WUE = Carbono ganho / Água perdida).
-    # Varia drasticamente com espécie, CO2 atmosférico, VPD, etc.
     carbono_via_et_wue = et_litros_dia * coeffs_carbon["c_et_wue_carbon"]
-
-    # Para esta ferramenta, podemos apresentar ambas ou uma média, com muitas ressalvas.
-    # Vamos retornar uma média ponderada ou a mais defensável (AFT, com ressalvas).
-    # Para uma banca, a discussão sobre como obter k_aft_carbon e c_et_wue_carbon seria crucial.
-    # Ex: k_aft_carbon poderia vir de taxas fotossintéticas líquidas médias para espécies da Caatinga.
-    # Ex: c_et_wue_carbon viria de estudos de WUE para essas espécies.
-
-    # No contexto desta ferramenta, vamos usar a estimativa via AFT como principal,
-    # pois é um pouco menos indireta que a via ET/WUE sem dados de WUE.
     return round(carbono_via_aft, 4), round(carbono_via_et_wue, 4)
 
 # ---------------------------------------------------------------
@@ -132,8 +104,7 @@ st.title("🌳 Plataforma Avançada de Estimativa de Evapotranspiração e Anál
 st.subheader("Foco: Região de Crateús, Ceará, Brasil - Ferramenta de Suporte à Pesquisa de Doutorado")
 st.markdown("---")
 
-# --- Coluna da Esquerda: Entradas e Controles ---
-left_column, right_column = st.columns([2, 3])
+left_column, right_column = st.columns([2, 3]) # Ajuste a proporção conforme necessário
 
 with left_column:
     st.header("⚙️ Entradas e Configurações do Modelo")
@@ -150,34 +121,70 @@ with left_column:
 
     with st.expander("🌿 2. Dados Biométricos e Estruturais do Espécime", expanded=True):
         num_especimes = st.number_input("Número de Espécimes para Análise:", min_value=1, step=1, value=1, key="num_especimes_input")
-        st.session_state.especimes_data_list = [] # Lista para armazenar dados de cada espécime
+        # Limpar e recriar a lista de dados de espécimes se o número de espécimes mudar
+        # ou se for a primeira vez.
+        if 'num_especimes_anterior' not in st.session_state or st.session_state.num_especimes_anterior != num_especimes:
+            st.session_state.especimes_data_list = []
+            st.session_state.num_especimes_anterior = num_especimes
+
+        # Preencher st.session_state.especimes_data_list com dicts vazios se necessário
+        while len(st.session_state.especimes_data_list) < num_especimes:
+            st.session_state.especimes_data_list.append({})
 
         for i in range(num_especimes):
             st.markdown(f"--- \n **Espécime {i+1}**")
-            especime_id_user = st.text_input(f"Identificador do Espécime {i+1} (e.g., Tag001, EspecieX-LocalY):", f"Espécime_{i+1}", key=f"id_especime_{i}")
-            altura_m_str = st.text_input(f"📏 Altura Total (m) - Espécime {i+1}:", "2.5", key=f"altura_m_{i}")
-            diametro_cm_str = st.text_input(f"📐 Diâmetro à Altura do Peito (DAP) ou do Tronco (cm) - Espécime {i+1}:", "15", key=f"diametro_cm_{i}")
-            area_copa_m2_str = st.text_input(f"🌳 Área da Copa Projetada no Solo (m²) - Espécime {i+1}:", "3.0", key=f"area_copa_m2_{i}")
-            galhos_principais = st.number_input(f"🌿 Número Estimado de Galhos Estruturais Principais - Espécime {i+1}:", min_value=1, value=5, step=1, key=f"galhos_princ_{i}")
-            st.session_state[f"num_folhas_por_galho_estimado_{i}"] = st.number_input(f"🍂 Número Médio Estimado de Folhas por Galho Principal - Espécime {i+1}:", min_value=1, value=50, step=5, key=f"num_folhas_galho_est_{i}", help="Este é um parâmetro crucial e difícil. Em uma pesquisa real, exigiria amostragem e estudo alométrico.")
+            # Usar os dados da session_state para popular os campos, ou valores padrão
+            data_atual_especime = st.session_state.especimes_data_list[i]
 
-            st.markdown(f"**Medidas de Folhas de Amostra (Espécime {i+1}):** (Para estimar área foliar média)")
-            num_folhas_amostra = st.number_input(f"Quantas folhas de amostra para o Espécime {i+1}?", min_value=1, max_value=10, value=3, step=1, key=f"num_folhas_amostra_{i}")
-            folhas_data_especime_list = []
+            especime_id_user = st.text_input(f"Identificador do Espécime {i+1}:",
+                                             value=data_atual_especime.get("id_user", f"Espécime_{i+1}"),
+                                             key=f"id_especime_{i}")
+            altura_m_str = st.text_input(f"📏 Altura Total (m) - Espécime {i+1}:",
+                                         value=data_atual_especime.get("altura_m_str", "2.5"),
+                                         key=f"altura_m_{i}")
+            diametro_cm_str = st.text_input(f"📐 Diâmetro (cm) - Espécime {i+1}:",
+                                           value=data_atual_especime.get("diametro_cm_str", "15"),
+                                           key=f"diametro_cm_{i}")
+            area_copa_m2_str = st.text_input(f"🌳 Área da Copa Projetada (m²) - Espécime {i+1}:",
+                                             value=data_atual_especime.get("area_copa_m2_str", "3.0"),
+                                             key=f"area_copa_m2_{i}")
+            galhos_principais = st.number_input(f"🌿 Galhos Estruturais Principais - Espécime {i+1}:",
+                                                min_value=1, value=data_atual_especime.get("galhos_principais", 5),
+                                                step=1, key=f"galhos_princ_{i}")
+            num_folhas_galho_est_key = f"num_folhas_por_galho_estimado_{i}"
+            num_folhas_por_galho_estimado = st.number_input(f"🍂 Folhas Médias Estimadas / Galho Principal - Espécime {i+1}:",
+                                                              min_value=1, value=data_atual_especime.get("num_folhas_por_galho_estimado", 50),
+                                                              step=5, key=num_folhas_galho_est_key, help="Parâmetro crucial. Exige amostragem e estudo alométrico em pesquisa real.")
+
+            st.markdown(f"**Medidas de Folhas de Amostra (Espécime {i+1}):**")
+            num_folhas_amostra_key = f"num_folhas_amostra_{i}"
+            num_folhas_amostra = st.number_input(f"Quantas folhas de amostra para Espécime {i+1}?",
+                                                 min_value=1, max_value=10, value=data_atual_especime.get("num_folhas_amostra", 3),
+                                                 step=1, key=num_folhas_amostra_key)
+            
+            folhas_data_especime_list = data_atual_especime.get("folhas_data_list", [("6","12")] * num_folhas_amostra ) # Default if not set
+            # Ensure folhas_data_especime_list has the correct number of items based on num_folhas_amostra
+            if len(folhas_data_especime_list) != num_folhas_amostra:
+                folhas_data_especime_list = [("6","12")] * num_folhas_amostra # Reset to default if length mismatch
+
+            new_folhas_data = []
             cols_folhas_amostra = st.columns(num_folhas_amostra)
             for j in range(num_folhas_amostra):
                 with cols_folhas_amostra[j]:
-                    st.markdown(f"🍃 Folha {j+1}")
-                    largura_folha_cm_str = st.text_input(f"Largura (cm):", "6", key=f"larg_f_{i}_{j}")
-                    comprimento_folha_cm_str = st.text_input(f"Comp. (cm):", "12", key=f"comp_f_{i}_{j}")
-                    folhas_data_especime_list.append((largura_folha_cm_str, comprimento_folha_cm_str))
-
-            st.session_state.especimes_data_list.append({
+                    st.markdown(f"🍃 F{j+1}")
+                    default_larg, default_comp = folhas_data_especime_list[j] if j < len(folhas_data_especime_list) else ("6", "12")
+                    largura_folha_cm_str = st.text_input(f"L (cm):", default_larg, key=f"larg_f_{i}_{j}")
+                    comprimento_folha_cm_str = st.text_input(f"C (cm):", default_comp, key=f"comp_f_{i}_{j}")
+                    new_folhas_data.append((largura_folha_cm_str, comprimento_folha_cm_str))
+            
+            # Atualizar o dict na lista da session_state
+            st.session_state.especimes_data_list[i] = {
                 "id_user": especime_id_user, "altura_m_str": altura_m_str, "diametro_cm_str": diametro_cm_str,
                 "area_copa_m2_str": area_copa_m2_str, "galhos_principais": galhos_principais,
-                "folhas_data_list": folhas_data_especime_list,
-                "num_folhas_por_galho_estimado": st.session_state[f"num_folhas_por_galho_estimado_{i}"]
-            })
+                "folhas_data_list": new_folhas_data, "num_folhas_amostra": num_folhas_amostra,
+                "num_folhas_por_galho_estimado": num_folhas_por_galho_estimado
+            }
+
 
     with st.expander("🌦️ 3. Variáveis Climáticas Médias do Período de Análise", expanded=True):
         st.markdown("Valores médios para o período de interesse (e.g., diário, semanal, mensal).")
@@ -197,7 +204,7 @@ with left_column:
         st.session_state.et_model_coeffs["lai"] = cols_coeffs_et2[1].number_input("Peso LAI:", value=st.session_state.et_model_coeffs["lai"], step=0.01, format="%.2f", key="coeff_lai")
         cols_coeffs_et3 = st.columns(2)
         st.session_state.et_model_coeffs["temperatura"] = cols_coeffs_et3[0].number_input("Peso Temperatura:", value=st.session_state.et_model_coeffs["temperatura"], step=0.01, format="%.2f", key="coeff_temp")
-        st.session_state.et_model_coeffs["umidade"] = cols_coeffs_et3[1].number_input("Peso Umidade:", value=st.session_state.et_model_coeffs["umidade"], step=0.01, format="%.3f", key="coeff_umid") # Mais precisão para umidade
+        st.session_state.et_model_coeffs["umidade"] = cols_coeffs_et3[1].number_input("Peso Umidade:", value=st.session_state.et_model_coeffs["umidade"], step=0.01, format="%.3f", key="coeff_umid")
         cols_coeffs_et4 = st.columns(2)
         st.session_state.et_model_coeffs["radiacao"] = cols_coeffs_et4[0].number_input("Peso Radiação:", value=st.session_state.et_model_coeffs["radiacao"], step=0.001, format="%.3f", key="coeff_rad")
         st.session_state.et_model_coeffs["vento"] = cols_coeffs_et4[1].number_input("Peso Vento:", value=st.session_state.et_model_coeffs["vento"], step=0.001, format="%.3f", key="coeff_vento")
@@ -208,25 +215,22 @@ with left_column:
         st.session_state.carbon_model_coeffs["k_aft_carbon"] = st.number_input("Coef. Carbono via AFT (kg C/m²/dia):", value=st.session_state.carbon_model_coeffs["k_aft_carbon"], step=0.0001, format="%.4f", key="coeff_k_aft_c", help="Taxa média de fixação de Carbono por área foliar.")
         st.session_state.carbon_model_coeffs["c_et_wue_carbon"] = st.number_input("Coef. Carbono via ET/WUE (kg C/L ET):", value=st.session_state.carbon_model_coeffs["c_et_wue_carbon"], step=0.0001, format="%.4f", key="coeff_c_et_wue_c", help="Proxy para Eficiência no Uso da Água em termos de Carbono ganho por água perdida.")
 
-    # --- Botão de Cálculo Principal ---
     st.markdown("---")
     if st.button("🚀 Executar Simulação e Análise", type="primary", key="run_simulation_button", use_container_width=True):
-        st.session_state.resultados_modelo = [] # Limpa resultados anteriores
+        st.session_state.resultados_modelo = []
 
-        # Validar e converter dados climáticos
         try:
             temp_val = float(temp_c_str)
             umid_val = float(umid_perc_str)
             rad_val = float(rad_mj_m2_dia_str)
             vento_val = float(vento_m_s_str)
             if not (0 < umid_val <= 100):
-                st.error("Umidade Relativa deve estar entre 0 e 100%.")
+                st.error("Umidade Relativa deve estar entre 0 (exclusive) e 100%.")
                 st.stop()
         except ValueError:
             st.error("Erro: Verifique se todas as variáveis climáticas são números válidos.")
             st.stop()
 
-        # Processar cada espécime
         for i, especime_input_data in enumerate(st.session_state.especimes_data_list):
             try:
                 altura_m = float(especime_input_data["altura_m_str"])
@@ -235,47 +239,40 @@ with left_column:
                 galhos_p = int(especime_input_data["galhos_principais"])
                 num_folhas_galho_est = int(especime_input_data["num_folhas_por_galho_estimado"])
 
-
                 if not (0.1 <= altura_m <= 200 and 0.1 <= diametro_cm <= 500 and 0.1 <= area_copa_m2 <= 1000):
                      st.warning(f"Espécime {especime_input_data['id_user']}: Valores biométricos parecem fora de um intervalo comum. Verifique as unidades e valores.")
-                if galhos_p <=0 or num_folhas_galho_est <=0:
-                    st.warning(f"Espécime {especime_input_data['id_user']}: Número de galhos e folhas por galho deve ser positivo.")
-                    aft_m2_calc = 0
-                    lai_calc = 0
-                else:
-                    aft_m2_calc = calculate_area_foliar_total(especime_input_data["folhas_data_list"], galhos_p) # Passa num_folhas_galho_est implicitamente via session_state na função
-                    lai_calc = calculate_lai(aft_m2_calc, especime_input_data["area_copa_m2_str"])
+                
+                aft_m2_calc = calculate_area_foliar_total(especime_input_data["folhas_data_list"], galhos_p, num_folhas_galho_est)
+                lai_calc = calculate_lai(aft_m2_calc, especime_input_data["area_copa_m2_str"])
 
                 et_litros_dia_calc = predict_evapotranspiration_phd(
                     altura_m, diametro_cm, area_copa_m2, lai_calc,
                     temp_val, umid_val, rad_val, vento_val,
                     st.session_state.et_model_coeffs
                 )
-
                 carbono_aft_kg_dia, carbono_et_wue_kg_dia = estimate_carbon_absorption_phd(
                     aft_m2_calc, et_litros_dia_calc, st.session_state.carbon_model_coeffs
                 )
-
                 st.session_state.resultados_modelo.append({
-                    "ID Espécime": especime_input_data["id_user"],
-                    "Altura (m)": altura_m,
-                    "Diâmetro (cm)": diametro_cm,
-                    "Área Copa (m²)": area_copa_m2,
-                    "AFT Estimada (m²)": round(aft_m2_calc, 3),
-                    "LAI Estimado": lai_calc,
+                    "ID Espécime": especime_input_data["id_user"], "Altura (m)": altura_m,
+                    "Diâmetro (cm)": diametro_cm, "Área Copa (m²)": area_copa_m2,
+                    "AFT Estimada (m²)": round(aft_m2_calc, 3), "LAI Estimado": lai_calc,
                     "ET Modelo (L/dia)": et_litros_dia_calc,
                     "Carbono (AFT) (kgC/dia)": carbono_aft_kg_dia,
                     "Carbono (ET/WUE) (kgC/dia)": carbono_et_wue_kg_dia
                 })
-            except ValueError:
-                st.error(f"Erro ao processar dados do Espécime {especime_input_data['id_user']}. Verifique se todos os campos numéricos são válidos.")
-                continue # Pula para o próximo espécime
-            except Exception as e:
-                st.error(f"Erro inesperado ao processar Espécime {especime_input_data['id_user']}: {e}")
+            except ValueError as ve:
+                st.error(f"Erro ao processar dados do Espécime {especime_input_data.get('id_user', f'Índice {i}')}: {ve}. Verifique se todos os campos numéricos são válidos.")
                 continue
-        st.success(f"Simulação concluída para {len(st.session_state.resultados_modelo)} espécime(s). Veja os resultados à direita.")
+            except Exception as e:
+                st.error(f"Erro inesperado ao processar Espécime {especime_input_data.get('id_user', f'Índice {i}')}: {e}")
+                continue
+        if st.session_state.resultados_modelo: # Só mostra sucesso se algum resultado foi gerado
+             st.success(f"Simulação concluída para {len(st.session_state.resultados_modelo)} espécime(s). Veja os resultados à direita.")
+        else:
+             st.warning("Nenhum espécime pôde ser processado. Verifique as entradas e mensagens de erro.")
 
-# --- Coluna da Direita: Resultados e Análises ---
+
 with right_column:
     st.header("📊 Resultados da Simulação e Análises")
 
@@ -288,6 +285,7 @@ with right_column:
 
         st.subheader("Visualizações Gráficas dos Resultados do Modelo:")
         if not df_resultados.empty:
+            # ... (código dos gráficos permanece o mesmo) ...
             col_g1, col_g2 = st.columns(2)
             with col_g1:
                 if "ET Modelo (L/dia)" in df_resultados.columns:
@@ -328,41 +326,51 @@ with right_column:
             if "LAI Estimado" in df_resultados.columns and not df_resultados["LAI Estimado"].empty:
                 st.markdown("#### Boxplot do LAI Estimado entre Espécimes")
                 fig_box_lai, ax_box_lai = plt.subplots()
-                ax_box_lai.boxplot(df_resultados["LAI Estimado"].dropna(), patch_artist=True, vert=False)
+                ax_box_lai.boxplot(df_resultados["LAI Estimado"].dropna(), patch_artist=True, vert=False) #dropna para evitar erros se houver NaN
                 ax_box_lai.set_yticklabels(['LAI'])
                 ax_box_lai.set_xlabel('LAI Estimado')
                 ax_box_lai.set_title('Distribuição do LAI Estimado')
                 st.pyplot(fig_box_lai)
 
-
         st.markdown("---")
         st.subheader("🔬 Contraprova Experimental e Análise Estatística Comparativa")
         st.markdown("Insira abaixo os dados experimentais para comparação com as predições do modelo.")
 
-        # Coleta de dados experimentais
-        st.session_state.contraprovas_data = {}
-        num_medicoes_exp = st.number_input("Número de Medições Experimentais por Espécime:", min_value=1, value=3, step=1, key="num_med_exp")
-        tempo_coleta_exp_horas_str = st.text_input("Tempo de Coleta para Cada Medição Experimental (horas):", "24", key="tempo_coleta_exp_h")
+        num_medicoes_exp = st.number_input("Número de Medições Experimentais por Espécime:", min_value=1, value=3, step=1, key="num_med_exp_input") # Chave única
+        tempo_coleta_exp_horas_str = st.text_input("Tempo de Coleta para Cada Medição Experimental (horas):", "24", key="tempo_coleta_exp_h_input") # Chave única
+
+        # Atualizar a estrutura de st.session_state.contraprovas_data se necessário
+        for _, row_modelo in df_resultados.iterrows():
+            id_especime_modelo = row_modelo["ID Espécime"]
+            if id_especime_modelo not in st.session_state.contraprovas_data:
+                st.session_state.contraprovas_data[id_especime_modelo] = ["0"] * num_medicoes_exp
+            elif len(st.session_state.contraprovas_data[id_especime_modelo]) != num_medicoes_exp: # Ajusta se o número de medições mudou
+                 st.session_state.contraprovas_data[id_especime_modelo] = ["0"] * num_medicoes_exp
+
 
         for _, row_modelo in df_resultados.iterrows():
             id_especime_modelo = row_modelo["ID Espécime"]
             with st.container(border=True):
                 st.markdown(f"**Valores Experimentais para Espécime: {id_especime_modelo}**")
-                medicoes_especime_list = []
+                medicoes_especime_list_input = []
                 cols_med_exp = st.columns(num_medicoes_exp)
                 for k in range(num_medicoes_exp):
                     with cols_med_exp[k]:
-                        val_exp_ml_str = st.text_input(f"Medição {k+1} (mL):", "0", key=f"med_exp_{id_especime_modelo}_{k}")
-                        medicoes_especime_list.append(val_exp_ml_str)
-                st.session_state.contraprovas_data[id_especime_modelo] = medicoes_especime_list
+                        val_exp_ml_str = st.text_input(
+                            f"Medição {k+1} (mL):",
+                            value=st.session_state.contraprovas_data[id_especime_modelo][k], # Usar valor do estado
+                            key=f"med_exp_{id_especime_modelo}_{k}" # Chave única por campo
+                        )
+                        medicoes_especime_list_input.append(val_exp_ml_str)
+                st.session_state.contraprovas_data[id_especime_modelo] = medicoes_especime_list_input # Atualizar o estado
 
         tipo_teste_estatistico = st.selectbox(
             "Escolha o Teste Estatístico para Comparação (Modelo vs. Experimental):",
             ("Teste t de Student (1 amostra)", "Teste de Wilcoxon (Signed-Rank)", "Diferença Absoluta e Percentual"),
-            key="tipo_teste_stat_phd"
+            key="tipo_teste_stat_phd_select" # Chave única
         )
 
-        if st.button("🔄 Comparar Modelo com Dados Experimentais", key="run_comparison_button", use_container_width=True):
+        if st.button("🔄 Comparar Modelo com Dados Experimentais", key="run_comparison_button_phd", use_container_width=True): # Chave única
             if not st.session_state.contraprovas_data:
                 st.warning("Por favor, insira os dados experimentais.")
             else:
@@ -378,6 +386,7 @@ with right_column:
                 st.markdown("### Resultados da Comparação Estatística:")
                 all_exp_means_list = []
                 all_model_preds_list = []
+                valid_comparison_count = 0
 
                 for _, row_modelo in df_resultados.iterrows():
                     id_especime = row_modelo["ID Espécime"]
@@ -388,70 +397,99 @@ with right_column:
                         continue
 
                     medicoes_exp_str_list = st.session_state.contraprovas_data[id_especime]
-                    try:
-                        medicoes_exp_ml_float = [float(m) for m in medicoes_exp_str_list]
-                        medicoes_exp_L_dia = [(m_ml / 1000.0) / (tempo_coleta_h / 24.0) for m_ml in medicoes_exp_ml_float]
-                        media_exp_L_dia = np.mean(medicoes_exp_L_dia)
+                    
+                    # CORREÇÃO IMPLEMENTADA AQUI: Tratamento robusto de erros na conversão
+                    medicoes_exp_ml_float_validas = []
+                    valores_exp_invalidos_neste_especime = False
+                    for idx_med, med_str in enumerate(medicoes_exp_str_list):
+                        try:
+                            if not med_str.strip(): # Checa se a string é vazia ou só espaços
+                                st.warning(f"Valor experimental (Medição {idx_med+1}) para Espécime {id_especime} está vazio. Será ignorado.")
+                                continue # Pula esta medição específica
+                            med_float = float(med_str)
+                            medicoes_exp_ml_float_validas.append(med_float)
+                        except ValueError:
+                            st.error(f"Valor experimental '{med_str}' (Medição {idx_med+1}) para Espécime {id_especime} não é um número válido.")
+                            valores_exp_invalidos_neste_especime = True
+                    
+                    if valores_exp_invalidos_neste_especime:
+                        st.warning(f"Análise estatística para Espécime {id_especime} não pode prosseguir devido a valores experimentais inválidos.")
+                        continue # Pula para o próximo espécime
 
-                        all_exp_means_list.append(media_exp_L_dia)
-                        all_model_preds_list.append(et_modelo_val)
+                    if not medicoes_exp_ml_float_validas:
+                        st.warning(f"Nenhum dado experimental válido para Espécime {id_especime} após conversão.")
+                        continue # Pula para o próximo espécime
+                    # FIM DA CORREÇÃO
 
-                        st.markdown(f"#### Análise para Espécime: {id_especime}")
-                        st.write(f"- ET Prevista pelo Modelo: {et_modelo_val:.2f} L/dia")
-                        st.write(f"- ET Média Experimental: {media_exp_L_dia:.2f} L/dia (Baseado em {len(medicoes_exp_L_dia)} medições: {[f'{x:.2f}' for x in medicoes_exp_L_dia]})")
+                    medicoes_exp_L_dia = [(m_ml / 1000.0) / (tempo_coleta_h / 24.0) for m_ml in medicoes_exp_ml_float_validas]
+                    if not medicoes_exp_L_dia: # Se todas as medições foram inválidas/vazias
+                        st.warning(f"Nenhuma medição experimental processável para Espécime {id_especime}.")
+                        continue
+                    media_exp_L_dia = np.mean(medicoes_exp_L_dia)
 
-                        p_valor_teste_atual = None
-                        if tipo_teste_estatistico == "Teste t de Student (1 amostra)":
-                            if len(medicoes_exp_L_dia) < 2 or len(set(medicoes_exp_L_dia)) == 1:
-                                st.warning("Teste t requer pelo menos 2 medições com variabilidade.")
-                            else:
-                                stat_t, p_valor_teste_atual = stats.ttest_1samp(medicoes_exp_L_dia, et_modelo_val)
-                                st.write(f"  - Teste t: Estatística t = {stat_t:.3f}, p-valor = {p_valor_teste_atual:.4f}")
-                        elif tipo_teste_estatistico == "Teste de Wilcoxon (Signed-Rank)":
-                            if len(medicoes_exp_L_dia) < 1 : # scipy wilcoxon needs at least 1, but practically more
-                                st.warning("Teste de Wilcoxon requer pelo menos algumas medições.")
-                            else:
-                                diffs = np.array(medicoes_exp_L_dia) - et_modelo_val
-                                if np.all(diffs == 0):
-                                     st.warning("Teste de Wilcoxon não aplicável: todas as diferenças são zero.")
-                                else:
-                                    try:
-                                        stat_w, p_valor_teste_atual = stats.wilcoxon(diffs, alternative='two-sided') # Test if median of differences is zero
+                    all_exp_means_list.append(media_exp_L_dia)
+                    all_model_preds_list.append(et_modelo_val)
+                    valid_comparison_count += 1
+
+                    st.markdown(f"#### Análise para Espécime: {id_especime}")
+                    st.write(f"- ET Prevista pelo Modelo: {et_modelo_val:.2f} L/dia")
+                    st.write(f"- ET Média Experimental: {media_exp_L_dia:.2f} L/dia (Baseado em {len(medicoes_exp_L_dia)} medições válidas: {[f'{x:.2f}' for x in medicoes_exp_L_dia]})")
+
+                    p_valor_teste_atual = None
+                    if tipo_teste_estatistico == "Teste t de Student (1 amostra)":
+                        if len(medicoes_exp_L_dia) < 2 or len(set(medicoes_exp_L_dia)) < 2 : # Precisa de pelo menos 2 valores distintos
+                            st.warning("Teste t requer pelo menos 2 medições com variabilidade.")
+                        else:
+                            stat_t, p_valor_teste_atual = stats.ttest_1samp(medicoes_exp_L_dia, et_modelo_val)
+                            st.write(f"  - Teste t: Estatística t = {stat_t:.3f}, p-valor = {p_valor_teste_atual:.4f}")
+                    elif tipo_teste_estatistico == "Teste de Wilcoxon (Signed-Rank)":
+                        if len(medicoes_exp_L_dia) < 1:
+                            st.warning("Teste de Wilcoxon requer pelo menos uma medição.")
+                        else:
+                            diffs = np.array(medicoes_exp_L_dia) - et_modelo_val
+                            if np.all(diffs == 0) and len(diffs)>0 : # Se todas as diferenças são zero
+                                st.warning("Teste de Wilcoxon não aplicável: todas as diferenças entre modelo e experimento são zero.")
+                            elif len(diffs) == 0: # Se não houver diferenças (nenhum dado válido)
+                                st.warning("Teste de Wilcoxon não aplicável: não há dados para calcular as diferenças.")
+                            else: # Procede com o teste
+                                try:
+                                    # O teste de Wilcoxon em scipy.stats pode ter problemas com amostras muito pequenas
+                                    # ou quando as diferenças são todas iguais (não zero),
+                                    # ou quando há muitos empates.
+                                    # É mais robusto para n > ~5-8.
+                                    if len(diffs[diffs != 0]) == 0 and len(diffs) > 0: # Todas as diferenças são zero
+                                        st.warning("Teste de Wilcoxon não aplicável: todas as diferenças são zero (após remover zeros).")
+                                    elif len(diffs) > 0: # Procede apenas se houver diferenças
+                                        stat_w, p_valor_teste_atual = stats.wilcoxon(diffs, alternative='two-sided', zero_method='wilcox')
                                         st.write(f"  - Teste de Wilcoxon: Estatística W = {stat_w:.3f}, p-valor = {p_valor_teste_atual:.4f}")
-                                    except ValueError as e_wilcoxon:
-                                        st.warning(f"  - Teste de Wilcoxon não pôde ser calculado: {e_wilcoxon}")
+                                    else:
+                                        st.warning("Não há dados suficientes para o Teste de Wilcoxon após o processamento das diferenças.")
+                                except ValueError as e_wilcoxon:
+                                    st.warning(f"  - Teste de Wilcoxon não pôde ser calculado: {e_wilcoxon}. Pode ser devido a poucos dados ou empates excessivos.")
 
 
-                        diferenca_abs = abs(media_exp_L_dia - et_modelo_val)
-                        diferenca_perc = (diferenca_abs / media_exp_L_dia) * 100 if media_exp_L_dia != 0 else float('inf')
-                        st.write(f"  - Diferença Absoluta: {diferenca_abs:.2f} L/dia")
-                        st.write(f"  - Diferença Percentual: {diferenca_perc:.2f}%")
+                    diferenca_abs = abs(media_exp_L_dia - et_modelo_val)
+                    diferenca_perc = (diferenca_abs / media_exp_L_dia) * 100 if media_exp_L_dia != 0 else float('inf')
+                    st.write(f"  - Diferença Absoluta: {diferenca_abs:.2f} L/dia")
+                    st.write(f"  - Diferença Percentual: {diferenca_perc:.2f}%")
 
-                        if p_valor_teste_atual is not None:
-                            alpha = 0.05
-                            if p_valor_teste_atual < alpha:
-                                st.error(f"  - Conclusão: Diferença estatisticamente significativa (p < {alpha}). O modelo difere da média experimental para este espécime.")
-                            else:
-                                st.success(f"  - Conclusão: Diferença não estatisticamente significativa (p ≥ {alpha}). Não há evidência forte de que o modelo difere da média experimental.")
+                    if p_valor_teste_atual is not None:
+                        alpha = 0.05
+                        if p_valor_teste_atual < alpha:
+                            st.error(f"  - Conclusão: Diferença estatisticamente significativa (p < {alpha}). O modelo difere da média experimental para este espécime.")
+                        else:
+                            st.success(f"  - Conclusão: Diferença não estatisticamente significativa (p ≥ {alpha}). Não há evidência forte de que o modelo difere da média experimental.")
 
-                    except ValueError:
-                        st.error(f"Erro ao converter dados experimentais para o espécime {id_especime}. Verifique os valores.")
-                        continue
-                    except Exception as e_stat:
-                        st.error(f"Erro na análise estatística para {id_especime}: {e_stat}")
-                        continue
-                
-                # Análise Global (se houver múltiplos espécimes com dados)
-                if len(all_exp_means_list) > 1 and len(all_model_preds_list) > 1:
+                if valid_comparison_count > 1: # Análise Global
                     st.markdown("--- \n ### Análise Global de Desempenho do Modelo (Comparativo)")
                     exp_means_np_global = np.array(all_exp_means_list)
                     model_preds_np_global = np.array(all_model_preds_list)
-
+                    # ... (código da análise global permanece o mesmo) ...
                     rmse_global = np.sqrt(mean_squared_error(exp_means_np_global, model_preds_np_global))
                     mae_global = mean_absolute_error(exp_means_np_global, model_preds_np_global)
                     try:
                         r2_global = r2_score(exp_means_np_global, model_preds_np_global)
-                    except ValueError: # Can happen if only one sample or no variance
+                    except ValueError: 
                         r2_global = np.nan
 
                     st.write(f"**Métricas Globais de Comparação:**")
@@ -461,8 +499,8 @@ with right_column:
 
                     fig_scatter_global, ax_scatter_global = plt.subplots()
                     ax_scatter_global.scatter(model_preds_np_global, exp_means_np_global, alpha=0.7, edgecolors='k')
-                    min_val_plot = min(min(model_preds_np_global), min(exp_means_np_global))
-                    max_val_plot = max(max(model_preds_np_global), max(exp_means_np_global))
+                    min_val_plot = min(min(model_preds_np_global), min(exp_means_np_global)) if len(model_preds_np_global)>0 and len(exp_means_np_global)>0 else 0
+                    max_val_plot = max(max(model_preds_np_global), max(exp_means_np_global)) if len(model_preds_np_global)>0 and len(exp_means_np_global)>0 else 1
                     ax_scatter_global.plot([min_val_plot, max_val_plot], [min_val_plot, max_val_plot], 'r--', label="Linha 1:1 (Ideal)")
                     ax_scatter_global.set_xlabel("ET Prevista pelo Modelo (L/dia)")
                     ax_scatter_global.set_ylabel("ET Média Experimental (L/dia)")
@@ -470,18 +508,18 @@ with right_column:
                     ax_scatter_global.legend()
                     ax_scatter_global.grid(True)
                     st.pyplot(fig_scatter_global)
-                elif len(all_exp_means_list) <= 1:
-                    st.info("Análise global requer dados comparativos de pelo menos dois espécimes.")
+                elif df_resultados.shape[0] > 0: # Se houve resultados do modelo mas não comparações globais suficientes
+                     st.info("Análise global comparativa requer dados experimentais válidos de pelo menos dois espécimes.")
 
 
 # ---------------------------------------------------------------
-# 11. Seção Explicativa Expandida (Nível PhD)
+# Seções Explicativas e de Discussão (Nível PhD)
 # ---------------------------------------------------------------
 st.sidebar.title("Navegação e Informações")
 st.sidebar.info(f"""
 **Plataforma de Simulação e Análise para Pesquisa de Doutorado**
 Foco: Evapotranspiração e Dinâmica de Carbono em Ecossistemas Semiáridos (Crateús, Ceará).
-Versão: 1.0.0 (Robusta para Discussão em Banca)
+Versão: 1.0.1 (Correções e Robustez)
 Data: {pd.Timestamp.now().strftime('%Y-%m-%d')}
 """)
 
@@ -499,20 +537,20 @@ with st.sidebar.expander("⚠️ Limitações e Próximos Passos (PhD)", expande
 
 with st.expander("🔍 Fundamentos Teóricos e Metodológicos (Discussão para Banca)", expanded=False):
     st.markdown("### 📚 Modelo de Evapotranspiração (ET)")
-    st.markdown("""
+    st.markdown(r"""
     A ET é um componente crucial do ciclo hidrológico e do balanço energético, especialmente em regiões semiáridas como Crateús.
     - **Modelo Empírico Simplificado (Usado Aqui):** Uma função linear ponderada de variáveis biométricas e climáticas.
         - **Vantagens:** Simplicidade, fácil implementação, útil para análises exploratórias iniciais.
         - **Desvantagens para PhD:** Falta de base biofísica robusta, coeficientes arbitrários sem calibração, não captura interações complexas nem respostas não lineares.
     - **Abordagem de Doutorado (Recomendada):**
         1.  **Modelo de Penman-Monteith (FAO-56 PM):** Padrão ouro, combina balanço de energia com termos de transporte aerodinâmico e resistência superficial (condutância estomática, $g_s$). Requer calibração de $g_s$ para espécies locais da Caatinga, considerando fatores como déficit de pressão de vapor (VPD), radiação, umidade do solo.
-            $ET_0 = \\frac{0.408 \\Delta (R_n - G) + \\gamma \\frac{900}{T+273} u_2 (e_s - e_a)}{\\Delta + \\gamma (1 + 0.34 u_2)}$ (para cultura de referência)
+            $ET_0 = \frac{0.408 \Delta (R_n - G) + \gamma \frac{900}{T+273} u_2 (e_s - e_a)}{\Delta + \gamma (1 + 0.34 u_2)}$ (para cultura de referência)
             Para ET real ($ET_c$), $ET_c = K_c ET_0$ ou modelagem direta de $g_s$.
         2.  **Modelos de Machine Learning:** Random Forest, Gradient Boosting, Redes Neurais, treinados com dados de ET medidos (e.g., fluxo de seiva, lisímetros, covariância de vórtices) e preditores ambientais/biométricos. Exigem grandes conjuntos de dados para treinamento e validação.
     """)
 
-    st.markdown("### 🍂 Área Foliar Total (AFT) e Índice de Área Foliar (LAI)")
-    st.markdown("""
+    st.markdown(r"### 🍂 Área Foliar Total (AFT) e Índice de Área Foliar (LAI)")
+    st.markdown(r"""
     - **AFT:** Área total de superfície foliar fotossinteticamente ativa. Crucial para trocas gasosas.
     - **LAI:** AFT por unidade de área de solo ($LAI = AFT/A_{copa}$). Adimensional, indica a densidade do dossel.
     - **Estimativa (Usada Aqui):** Baseada na área média de folhas de amostra e estimativas do número de folhas. Altamente simplificado.
@@ -524,8 +562,8 @@ with st.expander("🔍 Fundamentos Teóricos e Metodológicos (Discussão para B
             -   **Sensoriamento Remoto:** Índices de vegetação (NDVI, EVI) de imagens de satélite/drone, correlacionados com LAI medido em campo.
     """)
 
-    st.markdown("### 🌳 Estimativa de Absorção/Captura de Carbono")
-    st.markdown("""
+    st.markdown(r"### 🌳 Estimativa de Absorção/Captura de Carbono")
+    st.markdown(r"""
     A fixação de carbono via fotossíntese é o principal mecanismo de entrada de C nos ecossistemas terrestres.
     - **Estimativa Simplificada (Usada Aqui):** Coeficientes fixos multiplicados por AFT ou ET. Meramente ilustrativo.
     - **Abordagem de Doutorado:**
@@ -537,8 +575,8 @@ with st.expander("🔍 Fundamentos Teóricos e Metodológicos (Discussão para B
         5.  **Eficiência no Uso da Água (WUE):** $WUE = A / E$ (Fotossíntese / Transpiração). Crucial em ambientes semiáridos. Varia com CO₂, VPD, espécie.
     """)
 
-    st.markdown("### 🔬 Análise Estatística e Validação de Modelos (PhD)")
-    st.markdown("""
+    st.markdown(r"### 🔬 Análise Estatística e Validação de Modelos (PhD)")
+    st.markdown(r"""
     - **Métricas de Desempenho:** RMSE, MAE, R², Bias, Índice de Willmott (d).
     - **Testes de Hipótese:** Para comparar médias ou distribuições (modelo vs. observado).
     - **Análise de Resíduos:** Verificar normalidade, homocedasticidade, ausência de autocorrelação. Padrões nos resíduos indicam falhas do modelo.
@@ -547,8 +585,8 @@ with st.expander("🔍 Fundamentos Teóricos e Metodológicos (Discussão para B
     - **Análise de Sensibilidade:** Identificar quais parâmetros de entrada mais influenciam as saídas do modelo (e.g., métodos locais OAT, métodos globais como Sobol).
     """)
 
-    st.markdown("### ⚛️ q-Estatística (Estatística de Tsallis) em Pesquisas Ecológicas")
-    st.markdown("""
+    st.markdown(r"### ⚛️ q-Estatística (Estatística de Tsallis) em Pesquisas Ecológicas")
+    st.markdown(r"""
     A q-estatística generaliza a estatística de Boltzmann-Gibbs, sendo útil para sistemas complexos com:
     -   **Não-extensividade:** Onde a entropia de um sistema composto não é a soma das entropias das partes.
     -   **Correlações de Longo Alcance, Efeitos de Memória, Hierarquias Fractais.**
@@ -557,12 +595,35 @@ with st.expander("🔍 Fundamentos Teóricos e Metodológicos (Discussão para B
     **Aplicação Potencial em ET e Carbono (Nível PhD):**
     1.  **Modelagem de Distribuições:** Se dados de ET, fluxos de carbono, ou erros de modelos exibirem caudas pesadas, distribuições q-generalizadas (q-Gaussiana, q-Exponencial) podem fornecer um ajuste melhor que as distribuições clássicas.
         -   A **q-Gaussiana** emerge da maximização da q-entropia de Tsallis sob certas restrições.
-        -   A **q-Exponencial** pode descrever processos de relaxação ou distribuições de probabilidade em sistemas não extensivos.
+        -   A **q-Exponencial** pode descrever processos de relaxação ou distribuições de probabilidade em sistemas não extensivos. A sua forma funcional pode ser: $f(x; q, \beta) = N \exp_q(-\beta x) = N [1 - (1-q) \beta x]_+^{1/(1-q)}$
     2.  **Análise de Séries Temporais:** Investigar se séries temporais de fluxos exibem memória de longo alcance ou multifractalidade, que podem ser caracterizadas usando ferramentas da q-estatística.
     3.  **Otimização e Inferência:** Métodos de otimização q-generalizados (e.g., Simulated Annealing q-generalizado) ou abordagens de inferência Bayesiana com q-distribuições.
 
     **Justificativa para Banca:** A aplicação da q-estatística seria justificada se houver evidência (teórica ou empírica dos dados de Crateús) de que os processos ecológicos subjacentes à ET e ao ciclo do carbono na Caatinga exibem características de sistemas complexos não adequadamente descritos pela estatística tradicional. Isso representaria uma fronteira de pesquisa, buscando uma compreensão mais fundamental da dinâmica do ecossistema.
     """)
+
+with st.expander("🌳 Estimativa Simplificada de Absorção/Captura de Carbono (Conceitual Detalhado)", expanded=False):
+    st.markdown(r"""
+    Estimar a absorção ou captura de carbono por plantas é um processo complexo. A evapotranspiração está indiretamente relacionada à absorção de carbono através da abertura dos estômatos.
+
+    **Modelo Simplificado Adotado (Apenas para Ilustração):**
+    As estimativas de carbono fornecidas nesta aplicação são **extremamente simplificadas** e baseadas em coeficientes hipotéticos multiplicados pela Área Foliar Total (AFT) ou pela Evapotranspiração (ET), como uma proxy para Eficiência no Uso da Água (WUE).
+    """)
+    st.latex(r'''
+    \text{Carbono}_{\text{AFT}} \text{(kg C/dia)} \approx k_{\text{AFT}} \times \text{AFT (m}^2\text{)}
+    ''')
+    st.latex(r'''
+    \text{Carbono}_{\text{ET/WUE}} \text{(kg C/dia)} \approx k_{\text{ET/WUE}} \times \text{ET (litros/dia)}
+    ''')
+    st.markdown(r"""
+    onde \( k_{\text{AFT}} \) (e.g., 0.005 kg C/m²/dia) e \( k_{\text{ET/WUE}} \) (e.g., 0.002 kg C/L ET) são os coeficientes ajustáveis na seção "Coeficientes do Modelo". Estes valores são **hipotéticos** e não validados cientificamente neste contexto sem pesquisa específica.
+    A função `estimate_carbon_absorption_phd` no código calcula ambas as estimativas.
+
+    **Limitações e Abordagem de Doutorado:**
+    -   Estas são simplificações que não consideram a fisiologia da fotossíntese, respiração, alocação de carbono, nem a variação da WUE com as condições ambientais e espécie.
+    -   Uma estimativa de doutorado requer modelos biofísicos detalhados (e.g., FvCB), medições de trocas gasosas, dados de biomassa e modelos de balanço de carbono calibrados para as espécies e condições de Crateús, Ceará.
+    """)
+
 
 st.markdown("---")
 st.caption(f"Plataforma de Simulação Avançada - Versão para Discussão em Banca de Doutorado. {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}")
