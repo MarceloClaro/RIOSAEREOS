@@ -1,6 +1,4 @@
 scipy
 pandas
 matplotlib
-sklearn
 scikit-learn
-tensorflow==2.5.0
