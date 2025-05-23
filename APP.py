@@ -240,21 +240,6 @@ if st.button("🔄 Comparar com a Contraprova"):
                     st.write("""
                     **Explicação:** Mostra a magnitude da diferença entre a média experimental e o valor previsto pelo modelo, sem considerar a variabilidade dos dados experimentais.
     
-                **Interpretação:** Este é o valor que o modelo estima para a evapotranspiração do espécime. Comparar esse valor com as medições experimentais, juntamente com a análise estatística, ajuda a avaliar a adequação do modelo para as condições específicas observadas. Uma diferença significativa pode indicar limitações do modelo ou a necessidade de ajustes nos coeficientes.
-                """)
-
-                valores_unicos = set(evap_exps)
-                if len(evap_exps) < 2 or len(valores_unicos) < 2:
-                    st.warning(
-                        "⚠️ Análise estatística inferencial limitada para este espécime: Não é possível realizar testes de hipótese robustos com uma única medição ou valores experimentais idênticos. "
-                        "A maioria dos testes exige variabilidade nos dados."
-                        "📈 **Análise Descritiva:**"
-                    )
-                    diferenca_abs = abs(media_experimental - et_modelo)
-                    st.write(f"📉 **Diferença Absoluta (modelo vs. experimento):** {diferenca_abs:.2f} litros/dia")
-                    st.write("""
-                    **Explicação:** Mostra a magnitude da diferença entre a média experimental e o valor previsto pelo modelo.
-    
                     **Interpretação:** Uma diferença absoluta pequena sugere que o modelo está razoavelmente próximo da média observada neste caso específico.
                     """)
                 else:
@@ -263,18 +248,18 @@ if st.button("🔄 Comparar com a Contraprova"):
                     if test_type == "Teste t de Student (1 amostra)":
                         # Assuming evap_exps represents a sample from a population with mean et_modelo under the null
                         try:
-                        stat, p_value = stats.ttest_1samp(evap_exps, et_modelo)
+                            stat, p_value = stats.ttest_1samp(evap_exps, et_modelo)
                             st.write(f"📈 **T-estatística (Teste t de 1 Amostra):** {stat:.4f}")
-                        st.write("""
+                            st.write("""
                             **Explicação:** A T-estatística quantifica a diferença entre a média da amostra experimental (as medições coletadas para este espécime) e o valor hipotético (a previsão do modelo para este espécime), normalizada pela variabilidade estimada da amostra.
     
                             **Interpretação:** Um valor absoluto alto da T-estatística sugere que a média experimental observada está distante do valor previsto pelo modelo, considerando a dispersão das medições.
                         """)
                             st.write(f"🔢 **P-valor (Teste t de 1 Amostra):** {p_value:.6f}")
-                        st.write("""
+                            st.write("""
                             **Explicação:** O P-valor é a probabilidade de observar uma T-estatística tão extrema (ou mais) quanto a calculada, *se* a evapotranspiração verdadeira do espécime for igual ao valor previsto pelo modelo (hipótese nula).
     
-                        **Interpretação:** 
+                            **Interpretação:** 
                             - **Se p < alpha (geralmente 0.05):** Rejeitamos a hipótese nula. Há evidência estatística de que a média experimental é significativamente diferente do valor previsto pelo modelo.
                             - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula. A diferença observada pode ser devida ao acaso amostral.
                         """)
@@ -295,16 +280,16 @@ if st.button("🔄 Comparar com a Contraprova"):
                             model_sample = [et_modelo] * len(evap_exps)
                             stat, p_value = stats.mannwhitneyu(evap_exps, model_sample, alternative='two-sided')
                             st.write(f"📉 **Estatística U (Teste de Mann-Whitney adaptado):** {stat:.4f}")
-                        st.write("""
+                            st.write("""
                             **Explicação:** A Estatística U mede a diferença entre as "posições relativas" dos dados experimentais comparados com o valor previsto pelo modelo. Um U baixo indica que as medições experimentais tendem a ser menores que o valor previsto, e um U alto (próximo de len(evap_exps)*len(model_sample)) indica que tendem a ser maiores.
     
                             **Interpretação:** Um valor U que difere significativamente do esperado sob a hipótese nula (tipicamente U = (n1*n2)/2) sugere uma diferença nas medianas ou distribuições. O P-valor ajuda a formalizar essa conclusão.
                         """)
                             st.write(f"🔢 **P-valor (Teste de Mann-Whitney adaptado):** {p_value:.6f}")
-                        st.write("""
+                            st.write("""
                             **Explicação:** O P-valor é a probabilidade de observar uma Estatística U tão extrema (ou mais) quanto a calculada, *se* as medições experimentais forem distribuídas de forma semelhante em torno do valor previsto pelo modelo.
     
-                        **Interpretação:** 
+                            **Interpretação:** 
                             - **Se p < alpha:** Rejeitamos a hipótese nula (que as medianas/distribuições são semelhantes).
                             - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula.
                         """)
@@ -356,9 +341,9 @@ if st.button("🔄 Comparar com a Contraprova"):
                             # The null hypothesis is that P(positive difference) = P(negative difference) = 0.5
                             # We can use a binomial test for this.
                             try:
-                                res = stats.binomtest(pos, n, 0.5, alternative='two-sided') # Use binomial test on number of positive signs
-                            st.write(f"📊 **Número de diferenças não-nulas:** {n}")
-                            st.write("""
+                                res = stats.binomtest(pos, n, 0.5, alternative='two-sided') # Use binomial test on number of positive signs_
+                                st.write(f"📊 **Número de diferenças não-nulas:** {n}")
+                                st.write("""
                                 **Explicação:** Este valor indica quantas das diferenças entre as medições experimentais e o valor previsto pelo modelo não são zero. O Teste de Sinal ignora as diferenças iguais a zero.
         
                                 **Interpretação:** O número de diferenças não-nulas determina o tamanho da amostra efetiva para o Teste de Sinal.
@@ -373,8 +358,8 @@ if st.button("🔄 Comparar com a Contraprova"):
                                 st.write(f"🔢 **P-valor (Teste de Sinal - Binomial):** {res.pvalue:.6f}")
                                 st.write("""
                                 **Explicação:** O P-valor é a probabilidade de observar uma proporção de sinais positivos (ou negativos) tão extrema (ou mais) quanto a calculada, *se* a verdadeira mediana das diferenças for zero (ou seja, os sinais positivo e negativo são igualmente prováveis).
-    
-                            **Interpretação:** 
+        
+                                **Interpretação:** 
                                 - **Se p < alpha:** Rejeitamos a hipótese nula. Há evidência estatística de um desequilíbrio significativo entre sinais positivos e negativos, sugerindo que a mediana das diferenças não é zero.
                                 - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula. O desequilíbrio observado pode ser devido ao acaso.
                                 """)
@@ -508,19 +493,19 @@ with col2:
         
         # Histograma
         if not df_hist.empty:
-        fig_hist, ax_hist = plt.subplots()
-        ax_hist.hist(df_hist['Evapotranspiração (litros/dia)'], bins=10, color='skyblue', edgecolor='black')
+            fig_hist, ax_hist = plt.subplots()
+            ax_hist.hist(df_hist['Evapotranspiração (litros/dia)'], bins=10, color='skyblue', edgecolor='black')
             ax_hist.set_title('Histograma de Evapotranspiração Estimada pelo Modelo')
-        ax_hist.set_xlabel('Litros/dia')
-        ax_hist.set_ylabel('Frequência')
-        st.pyplot(fig_hist)
+            ax_hist.set_xlabel('Litros/dia')
+            ax_hist.set_ylabel('Frequência')
+            st.pyplot(fig_hist)
 
-        # Boxplot
-        fig_box, ax_box = plt.subplots()
-        ax_box.boxplot(df_hist['Evapotranspiração (litros/dia)'], patch_artist=True)
+            # Boxplot
+            fig_box, ax_box = plt.subplots()
+            ax_box.boxplot(df_hist['Evapotranspiração (litros/dia)'], patch_artist=True)
             ax_box.set_title('Boxplot de Evapotranspiração Estimada pelo Modelo')
-        ax_box.set_ylabel('Litros/dia')
-        st.pyplot(fig_box)
+            ax_box.set_ylabel('Litros/dia')
+            st.pyplot(fig_box)
     else:
         st.write("Nenhum cálculo realizado ainda.")
 
