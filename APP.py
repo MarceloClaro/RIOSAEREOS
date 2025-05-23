@@ -4,6 +4,7 @@ import numpy as np
 import scipy.stats as stats
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
 # ---------------------------------------------------------------
 # 1. Armazenamento em session_state para persistência
@@ -48,6 +49,7 @@ def predict_evapotranspiration(image, altura, diametro, copa, lai, temperatura, 
 # 3. Cabeçalho e título com ícone/emoji
 # ---------------------------------------------------------------
 st.title("🌱 Estimativa de Evapotranspiração (Rios Aéreos)")
+st.markdown("Aplicação para estimar a evapotranspiração de espécimes arbóreos ou arbustivos, comparando resultados de um modelo empírico simplificado com medições experimentais e realizando análises estatísticas.")
 
 # ---------------------------------------------------------------
 # 4. Carregar imagem
@@ -186,8 +188,13 @@ test_type = st.selectbox(
 
 if st.button("🔄 Comparar com a Contraprova"):
     if len(st.session_state.resultados) == num_especies:
+        all_experimental_means = []
+        all_model_predictions = []
+        all_residuals = []
+
         for i in range(num_especies):
-            st.markdown(f"---\n**🌿 Espécime {i+1}:**")
+            st.markdown(f"---")
+            st.subheader(f"🔎 Análise Detalhada - Espécime {i+1}")
             try:
                 # Converter valores experimentais para float
                 valores_exp_float = [float(x) for x in contraprovas[i]]
@@ -199,9 +206,9 @@ if st.button("🔄 Comparar com a Contraprova"):
 
                 st.write("🌡️ **Medições (litros/dia):**", [f"{v:.2f}" for v in evap_exps])
                 st.write("""
-                **Explicação:** Estas são as medições experimentais de evapotranspiração convertidas para litros por dia.
+                **Explicação:** Estas são as medições experimentais de evapotranspiração convertidas para litros por dia, baseadas nas leituras de mL e no tempo de coleta informado.
     
-                **Interpretação:** A evapotranspiração experimental reflete os valores observados diretamente. Comparar estas medições com as estimativas do modelo permite avaliar a precisão do modelo.
+                **Interpretação:** A evapotranspiração experimental reflete os valores observados diretamente. Comparar estas medições com as estimativas do modelo permite avaliar a precisão do modelo e a variabilidade inerente às medições de campo.
                 """)
                 media_experimental = np.mean(evap_exps)
                 et_modelo = st.session_state.resultados[i]
@@ -213,145 +220,270 @@ if st.button("🔄 Comparar com a Contraprova"):
                 """)
                 st.write(f"🔮 **Valor previsto pelo modelo:** {et_modelo:.2f} litros/dia")
                 st.write("""
-                **Explicação:** Exibe o valor previsto pelo modelo de evapotranspiração, calculado com base nas variáveis inseridas (altura, diâmetro, copa, LAI, temperatura, umidade, radiação, vento).
+                **Explicação:** Exibe o valor previsto pelo modelo empírico simplificado de evapotranspiração, calculado com base nas variáveis inseridas (altura, diâmetro, copa, LAI, temperatura, umidade, radiação, vento) e seus respectivos pesos.
     
-                **Interpretação:** Este é o valor que o modelo estima para a evapotranspiração do espécime. Comparar esse valor com as medições experimentais ajuda a avaliar a precisão do modelo. Uma diferença muito grande pode indicar que o modelo precisa de ajustes.
+                **Interpretação:** Este é o valor que o modelo estima para a evapotranspiração do espécime. Comparar esse valor com as medições experimentais, juntamente com a análise estatística, ajuda a avaliar a adequação do modelo para as condições específicas observadas. Uma diferença significativa pode indicar limitações do modelo ou a necessidade de ajustes nos coeficientes.
+                """)
+                all_experimental_means.append(media_experimental)
+                all_model_predictions.append(et_modelo)
+                all_residuals.append(media_experimental - et_modelo)
+
+                valores_unicos = set(evap_exps)
+                if len(evap_exps) < 2 or len(valores_unicos) < 2:
+                    st.warning(
+                        "⚠️ Análise estatística limitada: Não é possível realizar testes de hipótese robustos com uma única medição ou valores experimentais idênticos. "
+                        "A maioria dos testes exige variabilidade nos dados. Considere coletar múltiplas medições sob diferentes condições.\n"
+                        "📈 **Análise Descritiva:**"
+                    )
+                    diferenca_abs = abs(media_experimental - et_modelo)
+                    st.write(f"📉 **Diferença Absoluta (modelo vs. experimento):** {diferenca_abs:.2f} litros/dia")
+                    st.write("""
+                    **Explicação:** Mostra a magnitude da diferença entre a média experimental e o valor previsto pelo modelo, sem considerar a variabilidade dos dados experimentais.
+    
+                **Interpretação:** Este é o valor que o modelo estima para a evapotranspiração do espécime. Comparar esse valor com as medições experimentais, juntamente com a análise estatística, ajuda a avaliar a adequação do modelo para as condições específicas observadas. Uma diferença significativa pode indicar limitações do modelo ou a necessidade de ajustes nos coeficientes.
                 """)
 
                 valores_unicos = set(evap_exps)
                 if len(evap_exps) < 2 or len(valores_unicos) < 2:
                     st.warning(
-                        "⚠️ Não é possível realizar o teste com uma única medição ou valores idênticos. "
-                        "O teste exige pelo menos 2 valores distintos.\n"
-                        "✅ Recomenda-se coletar mais medições em diferentes condições para análises mais robustas."
+                        "⚠️ Análise estatística inferencial limitada para este espécime: Não é possível realizar testes de hipótese robustos com uma única medição ou valores experimentais idênticos. "
+                        "A maioria dos testes exige variabilidade nos dados."
+                        "📈 **Análise Descritiva:**"
                     )
                     diferenca_abs = abs(media_experimental - et_modelo)
-                    st.write(f"📉 **Diferença (modelo x experimento):** {diferenca_abs:.2f} litros/dia")
+                    st.write(f"📉 **Diferença Absoluta (modelo vs. experimento):** {diferenca_abs:.2f} litros/dia")
                     st.write("""
-                    **Explicação:** Mostra a diferença absoluta entre o valor do modelo e o valor experimental.
+                    **Explicação:** Mostra a magnitude da diferença entre a média experimental e o valor previsto pelo modelo.
     
-                    **Interpretação:** A diferença absoluta fornece uma medida direta de quão distante o modelo está das medições experimentais. Se a diferença for pequena, isso indica que o modelo está ajustado corretamente; se for grande, pode ser necessário revisar o modelo ou os dados experimentais.
+                    **Interpretação:** Uma diferença absoluta pequena sugere que o modelo está razoavelmente próximo da média observada neste caso específico.
                     """)
                 else:
-                    p_value = None
+                    p_value = None # Initialize p_value
+                    st.markdown("📈 **Análise Estatística Inferencial (para este espécime):**")
                     if test_type == "Teste t de Student (1 amostra)":
+                        # Assuming evap_exps represents a sample from a population with mean et_modelo under the null
+                        try:
                         stat, p_value = stats.ttest_1samp(evap_exps, et_modelo)
-                        st.write(f"📈 **T-estatística:** {stat:.4f}")
+                            st.write(f"📈 **T-estatística (Teste t de 1 Amostra):** {stat:.4f}")
                         st.write("""
-                        **Explicação:** A T-estatística quantifica a diferença entre a média experimental e o valor do modelo, normalizada pela variabilidade dos dados.
+                            **Explicação:** A T-estatística quantifica a diferença entre a média da amostra experimental (as medições coletadas para este espécime) e o valor hipotético (a previsão do modelo para este espécime), normalizada pela variabilidade estimada da amostra.
     
-                        **Interpretação:** Quanto maior for o valor absoluto da T-estatística, mais significativa será a diferença entre a média experimental e o valor do modelo.
+                            **Interpretação:** Um valor absoluto alto da T-estatística sugere que a média experimental observada está distante do valor previsto pelo modelo, considerando a dispersão das medições.
                         """)
-                        st.write(f"🔢 **P-valor:** {p_value:.6f}")
+                            st.write(f"🔢 **P-valor (Teste t de 1 Amostra):** {p_value:.6f}")
                         st.write("""
-                        **Explicação:** O P-valor indica a probabilidade de observarmos uma diferença tão extrema quanto a observada, assumindo que a hipótese nula seja verdadeira.
+                            **Explicação:** O P-valor é a probabilidade de observar uma T-estatística tão extrema (ou mais) quanto a calculada, *se* a evapotranspiração verdadeira do espécime for igual ao valor previsto pelo modelo (hipótese nula).
     
                         **Interpretação:** 
-                        - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula de que não há diferença entre a média experimental e o valor do modelo.
-                        - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa. Não temos evidências suficientes para rejeitar a hipótese nula.
+                            - **Se p < alpha (geralmente 0.05):** Rejeitamos a hipótese nula. Há evidência estatística de que a média experimental é significativamente diferente do valor previsto pelo modelo.
+                            - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula. A diferença observada pode ser devida ao acaso amostral.
                         """)
+                        except Exception as e:
+                             st.warning(f"⚠️ Não foi possível executar o Teste t de Student: {e}. Verifique se há dados suficientes e variabilidade na amostra experimental.")
+
 
                     elif test_type == "Teste de Mann-Whitney":
-                        # Comparando com uma distribuição constante (et_modelo)
-                        stat, p_value = stats.mannwhitneyu(evap_exps, [et_modelo]*len(evap_exps), alternative='two-sided')
-                        st.write(f"📉 **Estatística U:** {stat:.4f}")
+                        # Comparing the distribution of experimental values to a constant (the model's prediction)
+                        # This application of Mann-Whitney is a bit unconventional as it typically compares two samples.
+                        # A more appropriate non-parametric test for comparing a sample to a theoretical median/value
+                        # would be the Wilcoxon Signed-Rank Test (if applicable to paired differences) or a permutation test.
+                        # However, following the user's initial selection:
+                        st.warning("⚠️ Nota sobre o Teste de Mann-Whitney: Este teste é tipicamente usado para comparar duas amostras independentes. Comparar uma amostra (medições experimentais) com um valor constante (previsão do modelo) não é a aplicação padrão e pode não ser a mais interpretável. Considere o Teste de Wilcoxon para dados pareados ou testes baseados em bootstrap/permutação para uma análise não paramétrica mais robusta.")
+                        # To technically run it by comparing the sample to a 'sample' of the model prediction:
+                        try:
+                            # Create a synthetic sample of the model prediction for comparison
+                            model_sample = [et_modelo] * len(evap_exps)
+                            stat, p_value = stats.mannwhitneyu(evap_exps, model_sample, alternative='two-sided')
+                            st.write(f"📉 **Estatística U (Teste de Mann-Whitney adaptado):** {stat:.4f}")
                         st.write("""
-                        **Explicação:** A Estatística U mede a diferença entre as distribuições dos dados experimentais e do modelo.
+                            **Explicação:** A Estatística U mede a diferença entre as "posições relativas" dos dados experimentais comparados com o valor previsto pelo modelo. Um U baixo indica que as medições experimentais tendem a ser menores que o valor previsto, e um U alto (próximo de len(evap_exps)*len(model_sample)) indica que tendem a ser maiores.
+    
+                            **Interpretação:** Um valor U que difere significativamente do esperado sob a hipótese nula (tipicamente U = (n1*n2)/2) sugere uma diferença nas medianas ou distribuições. O P-valor ajuda a formalizar essa conclusão.
+                        """)
+                            st.write(f"🔢 **P-valor (Teste de Mann-Whitney adaptado):** {p_value:.6f}")
+                        st.write("""
+                            **Explicação:** O P-valor é a probabilidade de observar uma Estatística U tão extrema (ou mais) quanto a calculada, *se* as medições experimentais forem distribuídas de forma semelhante em torno do valor previsto pelo modelo.
     
                         **Interpretação:** 
-                        - **Valores U baixos** indicam uma grande diferença entre as distribuições.
-                        - **Valores U altos** indicam uma menor diferença entre as distribuições.
+                            - **Se p < alpha:** Rejeitamos a hipótese nula (que as medianas/distribuições são semelhantes).
+                            - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula.
                         """)
-                        st.write(f"🔢 **P-valor (Mann-Whitney):** {p_value:.6f}")
-                        st.write("""
-                        **Explicação:** O P-valor determina se a diferença observada nas distribuições é significativa.
-    
-                        **Interpretação:** 
-                        - **Se p < 0,05**: As distribuições são significativamente diferentes. Rejeitamos a hipótese nula de que as distribuições são idênticas.
-                        - **Se p ≥ 0,05**: As distribuições não são significativamente diferentes. Não rejeitamos a hipótese nula.
-                        """)
+                        except Exception as e:
+                             st.warning(f"⚠️ Não foi possível executar o Teste de Mann-Whitney: {e}. Verifique se há dados suficientes.")
+
 
                     elif test_type == "Teste de Wilcoxon":
+                        # Wilcoxon Signed-Rank Test compares the median of differences to zero.
+                        # Here, the 'differences' are evap_exps - et_modelo. It tests if the median difference is zero.
                         differences = np.array(evap_exps) - et_modelo
+                        # Check if all differences are zero, which makes the test impossible
                         if np.all(differences == 0):
-                            st.warning("⚠️ Diferenças nulas impossibilitam o teste Wilcoxon.\n"
-                                       "**Interpretação:** Isso ocorre quando todas as medições são idênticas ao valor do modelo.")
+                            st.warning("⚠️ Teste de Wilcoxon impossibilitado: Todas as diferenças entre as medições experimentais e o valor do modelo são zero. Não há variabilidade para o teste analisar.")
                         else:
                             try:
-                                stat, p_value = stats.wilcoxon(differences)
-                                st.write(f"📈 **Estatística W:** {stat:.4f}")
+                                # The test requires non-zero differences
+                                nonzero_differences = differences[differences != 0]
+                                # A two-sided test is appropriate for checking if the median difference is not zero
+                                stat, p_value = stats.wilcoxon(nonzero_differences, alternative='two-sided') # Use nonzero_differences
+                                st.write(f"📈 **Estatística W (Teste de Wilcoxon):** {stat:.4f}")
                                 st.write("""
-                                **Explicação:** A Estatística W do Teste de Wilcoxon mede a soma das diferenças ordenadas das medições experimentais em relação ao modelo.
+                                **Explicação:** A Estatística W (ou V, dependendo da implementação) do Teste de Wilcoxon Signed-Rank é baseada nas postos (ranks) das diferenças absolutas entre cada medição experimental e o valor previsto pelo modelo. Soma os postos das diferenças positivas ou negativas.
     
-                                **Interpretação:** 
-                                - **W alto**: Indica uma grande diferença entre as amostras pareadas.
-                                - **W baixo**: Indica uma diferença menor.
+                                **Interpretação:** Um valor W pequeno (ou grande, dependendo da definição) sugere que as diferenças tendem a ter o mesmo sinal, indicando que as medições experimentais são consistentemente maiores ou menores que a previsão do modelo.
                                 """)
-                                st.write(f"🔢 **P-valor (Wilcoxon):** {p_value:.6f}")
+                                st.write(f"🔢 **P-valor (Teste de Wilcoxon):** {p_value:.6f}")
                                 st.write("""
-                                **Explicação:** O P-valor determina se a diferença observada nas medições pareadas é significativa.
+                                **Explicação:** O P-valor é a probabilidade de observar uma Estatística W tão extrema (ou mais) quanto a calculada, *se* a mediana das diferenças entre as medições experimentais e o valor previsto pelo modelo for zero (hipótese nula).
     
                                 **Interpretação:** 
-                                - **Se p < 0,05**: A diferença é estatisticamente significativa. Rejeitamos a hipótese nula de que não há diferença nas medianas das amostras pareadas.
-                                - **Se p ≥ 0,05**: A diferença não é estatisticamente significativa. Não rejeitamos a hipótese nula.
+                                - **Se p < alpha:** Rejeitamos a hipótese nula. Há evidência estatística de que a mediana das diferenças não é zero, sugerindo uma diferença sistemática entre as medições e o modelo.
+                                - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula. A mediana das diferenças pode ser zero.
                                 """)
                             except Exception as e:
-                                st.error(f"⚠️ Erro no teste de Wilcoxon: {e}")
+                                st.error(f"⚠️ Erro ao executar o Teste de Wilcoxon: {e}. Verifique se há dados suficientes e variabilidade nas diferenças não-nulas.")
 
                     elif test_type == "Teste de Sinal":
+                        # Tests if the median of the differences is different from zero based on the sign of the differences.
+                        # It's less powerful than Wilcoxon as it only uses the sign, not the magnitude of differences.
                         differences = np.array(evap_exps) - et_modelo
                         nonzero_diff = differences[differences != 0]
                         n = len(nonzero_diff)
                         if n == 0:
-                            st.warning("⚠️ Todos os valores experimentais são iguais ao valor do modelo.\n"
-                                       "**Interpretação:** O teste de Sinal não pode ser aplicado quando todas as diferenças são nulas.")
+                            st.warning("⚠️ Teste de Sinal impossibilitado: Todas as diferenças entre as medições experimentais e o valor do modelo são zero. Não há sinais para analisar.")
                         else:
                             pos = np.sum(nonzero_diff > 0)
-                            res = stats.binomtest(pos, n, 0.5)
+                            neg = np.sum(nonzero_diff < 0)
+                            # The null hypothesis is that P(positive difference) = P(negative difference) = 0.5
+                            # We can use a binomial test for this.
+                            try:
+                                res = stats.binomtest(pos, n, 0.5, alternative='two-sided') # Use binomial test on number of positive signs
                             st.write(f"📊 **Número de diferenças não-nulas:** {n}")
                             st.write("""
-                            **Explicação:** Este valor indica quantas das diferenças entre as medições experimentais e o modelo são positivas.
+                                **Explicação:** Este valor indica quantas das diferenças entre as medições experimentais e o valor previsto pelo modelo não são zero. O Teste de Sinal ignora as diferenças iguais a zero.
+        
+                                **Interpretação:** O número de diferenças não-nulas determina o tamanho da amostra efetiva para o Teste de Sinal.
+                                """)
+                                st.write(f"📈 **Número de sinais positivos:** {pos}")
+                                st.write(f"📉 **Número de sinais negativos:** {neg}")
+                                st.write("""
+                                **Explicação:** Conta quantas medições experimentais foram maiores (sinal positivo) ou menores (sinal negativo) que o valor previsto pelo modelo.
+        
+                                **Interpretação:** Sob a hipótese nula (mediana das diferenças é zero), esperaríamos aproximadamente um número igual de sinais positivos e negativos. Um desequilíbrio sugere que as medições tendem a estar consistentemente acima ou abaixo da previsão do modelo.
+                                """)
+                                st.write(f"🔢 **P-valor (Teste de Sinal - Binomial):** {res.pvalue:.6f}")
+                                st.write("""
+                                **Explicação:** O P-valor é a probabilidade de observar uma proporção de sinais positivos (ou negativos) tão extrema (ou mais) quanto a calculada, *se* a verdadeira mediana das diferenças for zero (ou seja, os sinais positivo e negativo são igualmente prováveis).
     
                             **Interpretação:** 
-                            - **Maior número de sinais positivos**: Mais medições estão acima do modelo.
-                            - **Maior número de sinais negativos**: Mais medições estão abaixo do modelo.
-                            """)
-                            st.write(f"📈 **Número de sinais positivos:** {pos}")
-                            st.write(f"🔢 **P-valor (Teste de Sinal):** {res.pvalue:.6f}")
+                                - **Se p < alpha:** Rejeitamos a hipótese nula. Há evidência estatística de um desequilíbrio significativo entre sinais positivos e negativos, sugerindo que a mediana das diferenças não é zero.
+                                - **Se p >= alpha:** Não temos evidência estatística forte para rejeitar a hipótese nula. O desequilíbrio observado pode ser devido ao acaso.
+                                """)
+                            except Exception as e:
+                                st.error(f"⚠️ Erro ao executar o Teste de Sinal: {e}. Verifique se há dados suficientes.")
+
+                    else:  # Diferença Absoluta (já tratada na seção de análise descritiva para caso de N<2)
+                         if len(evap_exps) >= 2 and len(valores_unicos) >= 2:
+                            diferenca_abs = abs(media_experimental - et_modelo)
+                            st.write(f"📉 **Diferença Absoluta (modelo vs. experimento):** {diferenca_abs:.2f} litros/dia")
                             st.write("""
-                            **Explicação:** O P-valor determina se a proporção de sinais positivos é significativamente diferente de 0,5.
-    
-                            **Interpretação:** 
-                            - **Se p < 0,05**: A proporção de sinais positivos é significativamente diferente de 0,5, indicando uma tendência estatística.
-                            - **Se p ≥ 0,05**: Não há evidências suficientes para afirmar que a proporção difere de 0,5.
+                            **Explicação:** Calcula a diferença direta entre a média experimental e o valor previsto pelo modelo. Esta métrica fornece uma medida de erro simples, mas não considera a variabilidade dentro das medições experimentais.
+        
+                            **Interpretação:** Uma diferença absoluta pequena indica que o modelo está próximo da média observada. É uma métrica útil para resumir o erro, mas a análise estatística inferencial (acima) é necessária para avaliar se essa diferença é estatisticamente significativa.
                             """)
 
-                    else:  # Diferença Absoluta
-                        diferenca_abs = abs(media_experimental - et_modelo)
-                        st.write(f"📉 **Diferença Absoluta (modelo x experimento):** {diferenca_abs:.2f} litros/dia")
-                        st.write("""
-                        **Explicação:** Calcula a diferença direta entre o valor previsto pelo modelo e a média das medições experimentais.
-    
-                        **Interpretação:** 
-                        - **Diferença pequena**: O modelo está ajustado corretamente.
-                        - **Diferença grande**: Revisar modelo ou dados experimentais.
-                        """)
 
+                    # Conclusion based on p-value if available
                     if p_value is not None:
-                        alpha = 0.05
-                        if p_value < alpha:
-                            st.error("❌ **Diferença estatisticamente significativa (p < 0.05).**")
+                        alpha = 0.05 # Standard significance level
+                        st.markdown("---")
+                        st.subheader("Conclusão Estatística:")
+                        if p_value is not None and p_value < alpha: # Check if p_value was set
+                            st.error("❌ **Resultado Estatisticamente Significativo (p < 0.05).**")
                             st.write("""
-                            **Interpretação:** A diferença entre o modelo e as medições é significativa. O modelo pode precisar de ajustes.
+                            **Interpretação (para este espécime):** A análise estatística indica que a diferença observada entre as medições experimentais e o valor previsto pelo modelo para este espécime **é estatisticamente significativa** ao nível de significância de 5%. Isso sugere que é improvável que a diferença observada seja apenas devido ao acaso amostral. Portanto, pode haver uma limitação no modelo em prever a evapotranspiração para este espécime sob as condições observadas, ou podem existir fatores não considerados pelo modelo que influenciam a evapotranspiração real.
                             """)
                         else:
-                            st.info("✅ **Diferença não é estatisticamente significativa (p ≥ 0.05).**")
+                            st.info("✅ **Resultado Não Estatisticamente Significativo (p ≥ 0.05).**")
                             st.write("""
-                            **Interpretação:** Não há diferença significativa entre o modelo e as medições. O modelo parece adequado.
+                            **Interpretação:** A análise estatística indica que a diferença observada entre as medições experimentais e o valor previsto pelo modelo para este espécime **não é estatisticamente significativa** ao nível de significância de 5%. Isso significa que não há evidência estatística forte para concluir que a média experimental difere do valor previsto pelo modelo. A diferença observada pode ser explicada pela variabilidade natural ou pelo acaso amostral. Isso sugere que o modelo pode ser adequado para prever a evapotranspiração para este espécime sob as condições observadas, embora a ausência de significância não prove que o modelo está "correto", apenas que os dados atuais não fornecem evidência suficiente para rejeitá-lo.
                             """)
+                        else:
+                             st.info("ℹ️ Teste estatístico inferencial não aplicável ou não produziu P-valor para este espécime devido a dados insuficientes/idênticos ou erro no teste.")
+
 
             except ValueError:
                 st.error(f"⚠️ Espécime {i+1}: Insira valores experimentais válidos (números).")
+        
+        # --- Análise Global do Modelo (após o loop dos espécimes) ---
+        if len(all_experimental_means) > 1 and len(all_model_predictions) > 1: # Precisa de pelo menos 2 pontos para métricas globais e regressão
+            st.markdown("---")
+            st.header("🌍 Análise Global do Desempenho do Modelo")
+
+            # Converter para arrays numpy para cálculos
+            exp_means_np = np.array(all_experimental_means)
+            model_preds_np = np.array(all_model_predictions)
+            residuals_np = np.array(all_residuals)
+
+            # Métricas Globais
+            global_rmse = np.sqrt(mean_squared_error(exp_means_np, model_preds_np))
+            global_mae = mean_absolute_error(exp_means_np, model_preds_np)
+            global_r2 = r2_score(exp_means_np, model_preds_np)
+
+            st.subheader("📊 Métricas Globais de Desempenho")
+            st.write(f"**Root Mean Squared Error (RMSE) Global:** {global_rmse:.4f} litros/dia")
+            st.write(f"**Mean Absolute Error (MAE) Global:** {global_mae:.4f} litros/dia")
+            st.write(f"**R-squared (R²) Global:** {global_r2:.4f}")
+            st.write("""
+            **Interpretação das Métricas Globais:**
+            - **RMSE e MAE:** Medem o erro médio das previsões do modelo em relação às médias experimentais de todos os espécimes. Valores menores indicam melhor ajuste.
+            - **R²:** Indica a proporção da variância nas médias experimentais que é explicada pelo modelo. Um valor próximo de 1 sugere que o modelo explica bem a variabilidade observada. Um R² baixo ou negativo indica um mau ajuste.
+            """)
+
+            # Análise de Regressão Linear
+            st.subheader("📈 Análise de Regressão: Experimental vs. Modelo")
+            slope, intercept, r_value, p_value_reg, std_err = stats.linregress(model_preds_np, exp_means_np)
+            
+            fig_reg, ax_reg = plt.subplots()
+            ax_reg.scatter(model_preds_np, exp_means_np, label='Dados (Espécimes)', color='blue', alpha=0.7)
+            ax_reg.plot(model_preds_np, intercept + slope * model_preds_np, 'r', label=f'Linha de Regressão\ny={slope:.2f}x + {intercept:.2f}\nR²={r_value**2:.2f}')
+            ax_reg.plot([min(model_preds_np.min(), exp_means_np.min()), max(model_preds_np.max(), exp_means_np.max())], 
+                        [min(model_preds_np.min(), exp_means_np.min()), max(model_preds_np.max(), exp_means_np.max())], 
+                        'k--', label='Linha 1:1 (Ideal)')
+            ax_reg.set_xlabel("ET Prevista pelo Modelo (litros/dia)")
+            ax_reg.set_ylabel("ET Média Experimental (litros/dia)")
+            ax_reg.set_title("Regressão: ET Experimental vs. ET Modelo")
+            ax_reg.legend()
+            ax_reg.grid(True)
+            st.pyplot(fig_reg)
+            st.write(f"**Intercepto:** {intercept:.4f}, **Inclinação (Slope):** {slope:.4f}, **P-valor da Regressão:** {p_value_reg:.4f}")
+            st.write("""
+            **Interpretação da Regressão:**
+            - **Linha 1:1 (Ideal):** Se os pontos estiverem próximos desta linha, o modelo prevê com precisão.
+            - **Intercepto:** Idealmente próximo de 0. Um intercepto significativamente diferente de 0 indica um viés sistemático (o modelo consistentemente superestima ou subestima).
+            - **Inclinação (Slope):** Idealmente próximo de 1. Uma inclinação < 1 sugere que o modelo subestima valores altos e superestima baixos (ou vice-versa se > 1).
+            - **R² da Regressão:** Similar ao R² global, mede o quão bem a linha de regressão se ajusta aos dados.
+            - **P-valor da Regressão:** Testa a significância da relação linear. Um P-valor baixo (<0.05) sugere que a relação linear é estatisticamente significativa.
+            """)
+
+            # Análise de Resíduos
+            st.subheader("📉 Análise de Resíduos")
+            fig_res, ax_res = plt.subplots()
+            ax_res.scatter(model_preds_np, residuals_np, color='green', alpha=0.7)
+            ax_res.axhline(0, color='red', linestyle='--')
+            ax_res.set_xlabel("ET Prevista pelo Modelo (litros/dia)")
+            ax_res.set_ylabel("Resíduos (Experimental - Modelo)")
+            ax_res.set_title("Resíduos vs. Valores Previstos")
+            ax_res.grid(True)
+            st.pyplot(fig_res)
+            st.write("""
+            **Interpretação dos Resíduos:**
+            - Idealmente, os resíduos devem estar dispersos aleatoriamente em torno da linha horizontal em 0, sem padrões óbvios.
+            - **Padrões (ex: forma de funil, curva):** Podem indicar problemas como heterocedasticidade (variância não constante dos erros), não linearidade não capturada pelo modelo, ou variáveis omitidas.
+            - **Outliers:** Pontos muito distantes da linha zero podem ser investigados.
+            """)
+        elif len(all_experimental_means) <= 1:
+            st.info("ℹ️ Análise global do modelo requer dados de pelo menos dois espécimes com medições experimentais válidas.")
+
     else:
         st.warning("⚠️ É necessário primeiro calcular a evapotranspiração pelo modelo para todos os espécimes.")
 
@@ -371,13 +503,14 @@ with col2:
         st.dataframe(df_hist)
         st.line_chart(df_hist.set_index('Espécime')['Evapotranspiração (litros/dia)'])
         
-        # Visualizações adicionais: Histograma e Boxplot
-        st.markdown("### 📊 Visualizações Adicionais")
+        # Visualizações adicionais: Histograma e Boxplot dos resultados do MODELO
+        st.markdown("### 📊 Visualizações Adicionais (Evapotranspiração Estimada pelo Modelo)")
         
         # Histograma
+        if not df_hist.empty:
         fig_hist, ax_hist = plt.subplots()
         ax_hist.hist(df_hist['Evapotranspiração (litros/dia)'], bins=10, color='skyblue', edgecolor='black')
-        ax_hist.set_title('Histograma de Evapotranspiração')
+            ax_hist.set_title('Histograma de Evapotranspiração Estimada pelo Modelo')
         ax_hist.set_xlabel('Litros/dia')
         ax_hist.set_ylabel('Frequência')
         st.pyplot(fig_hist)
@@ -385,92 +518,117 @@ with col2:
         # Boxplot
         fig_box, ax_box = plt.subplots()
         ax_box.boxplot(df_hist['Evapotranspiração (litros/dia)'], patch_artist=True)
-        ax_box.set_title('Boxplot de Evapotranspiração')
+            ax_box.set_title('Boxplot de Evapotranspiração Estimada pelo Modelo')
         ax_box.set_ylabel('Litros/dia')
         st.pyplot(fig_box)
     else:
         st.write("Nenhum cálculo realizado ainda.")
 
 # ---------------------------------------------------------------
-# 11. Seção Explicativa Expandida com Fórmulas e Interpretações
+# 11. Seção Explicativa Expandida com Fórmulas e Interpretações (Enhanced for PhD Level)
 # ---------------------------------------------------------------
-with st.expander("🔍 Explicação Técnica e Interpretação Detalhada"):
-    st.markdown("### 📚 Cálculos e Fórmulas")
-    st.markdown("**Área Foliar Total (AFT):**")
-    st.latex(r'''
-    \text{AFT} = \sum_{i=1}^{n} (\text{largura}_i \times \text{comprimento}_i) \times \text{galhos}
-    ''')
-    st.markdown("**Índice de Área Foliar (LAI):**")
-    st.latex(r'''
-    \text{LAI} = \frac{\text{AFT}}{\text{Área da Copa}}
-    ''')
-    st.markdown("**Evapotranspiração (Modelo):**")
-    st.latex(r'''
-    \text{ET (litros/dia)} = 
-    [0.3 \times \text{Altura (m)} + 0.2 \times \text{Diâmetro (cm)} 
-    + 0.1 \times \text{Área da Copa (m²)} + 0.2 \times \text{LAI} 
-    + 0.1 \times \text{Temperatura (°C)} + 0.05 \times \text{Umidade Relativa (\%)} 
-    + 0.03 \times \text{Radiação Solar (MJ/m²)} + 0.02 \times \text{Velocidade do Vento (m/s)}] \times 10
-    ''')
+with st.expander("🔍 Explicação Técnica e Interpretação Detalhada (Nível PhD)"):
+    st.markdown("### 📚 Fundamentos do Modelo e Cálculos")
     st.markdown("""
-    ## 📊 Testes Estatísticos
-    - **Teste t de Student:** Compara a média de um conjunto de dados com um valor hipotético.
-    - **Teste de Mann-Whitney:** Teste não paramétrico que compara distribuições; útil quando os dados não seguem distribuição normal.
-    - **Teste de Wilcoxon:** Teste não paramétrico que compara medianas de amostras pareadas ou diferenças; útil para dados não normais.
-    - **Teste de Sinal:** Teste não paramétrico simples baseado no sinal das diferenças entre observações e um valor hipotético.
-    - **Diferença Absoluta:** Calcula a diferença direta entre a média experimental e o valor do modelo sem inferência estatística.
+    O modelo de evapotranspiração aqui apresentado é uma **abordagem empírica simplificada**. Ele combina variáveis físicas do espécime (Altura, Diâmetro, Área da Copa, LAI) com variáveis climáticas (Temperatura, Umidade, Radiação, Vento) utilizando pesos fixos. É crucial entender que, em um estudo de nível de doutorado, um modelo mais robusto seria idealmente:
+    
+    1.  **Baseado em princípios biofísicos:** Modelos como Penman-Monteith ou Priestley-Taylor, que derivam a ET de forma mais mecanística a partir do balanço de energia e resistência aerodinâmica/superficial.
+    2.  **Calibrado e Validado com Dados Reais:** Os pesos (coeficientes) e a estrutura do modelo seriam determinados e ajustados usando extensos conjuntos de dados de medições de ET (por exemplo, usando câmaras de fluxo, lisímetros ou técnicas de covariância de vórtices) sob diversas condições ambientais e para diferentes espécies.
+    3.  **Considerar Dinâmicas Temporais:** A ET varia significativamente ao longo do dia e das estações. Um modelo robusto incorporaria essas dinâmicas.
+    """)
+    st.markdown("**Área Foliar Total (AFT):** Uma métrica da área total das folhas do espécime. A fórmula usada (`largura * comprimento`) é uma aproximação simples para a área de folha individual e `* galhos` assume uma homogeneidade. Em estudos avançados, a AFT seria estimada usando métodos mais precisos como análise de imagem 3D, varredura a laser (LiDAR) ou relações alométricas espécie-específicas. A unidade é m² (se largura/comprimento em cm, converter).")
+    st.latex(r'''
+    \text{AFT} = \sum_{\text{folhas}} (\text{área da folha}) \times \text{número total de folhas (ou estimado por galho/árvore)}
+    ''')
+    st.markdown("**Índice de Área Foliar (LAI):** Uma variável adimensional crucial em ecologia e modelagem hidrológica. Representa a área foliar unilateral por unidade de área de solo projetada pela copa. Um LAI alto indica uma densa cobertura foliar, o que geralmente se correlaciona com taxas de ET mais altas (até certo ponto). É calculado como AFT / Área da Copa.")
+    st.latex(r'''
+    \text{LAI} = \frac{\text{Área Foliar Total (m}^2\text{)}}{\text{Área da Copa Projetada no Solo (m}^2\text{)}}
+    ''')
+    st.markdown("**Evapotranspiração (Modelo Empírico Atual):** A fórmula linear é um *proxy* ou uma simplificação extrema. Cada termo tenta capturar a influência relativa de diferentes variáveis na ET. Os pesos (0.3, 0.2, etc.) são arbitrários neste contexto de demonstração. Em um contexto de pesquisa rigoroso, eles seriam parâmetros do modelo a serem estimados (calibrados) a partir de dados experimentais usando regressão, otimização ou métodos de aprendizado de máquina. A unidade estimada é litros/dia.")
+    st.latex(r'''
+    \text{ET}_{\text{modelo}} = f(\text{Características Físicas, Variáveis Climáticas})
+    ''')
+    st.markdown("### 📊 Análise Estatística e Comparação Modelo-Experimento (Nível PhD)")
+    st.markdown("""
+    A comparação entre as estimativas do modelo e as medições experimentais é fundamental para **validar o modelo** e entender sua precisão e limitações. Várias abordagens estatísticas podem ser usadas:
 
-    Cada teste possui requisitos e interpretações específicas. Escolha o teste adequado com base 
-    no tamanho da amostra, distribuição dos dados e tipo de hipótese a ser testada.
+    -   **Métricas de Erro e Desempenho:**
+        -   **RMSE (Root Mean Squared Error):** Mede o desvio quadrático médio entre as previsões e as observações. É sensível a grandes erros. Unidade: litros/dia.
+        -   **MAE (Mean Absolute Error):** Mede o desvio absoluto médio. Menos sensível a outliers que o RMSE. Unidade: litros/dia.
+        -   **R-squared (R²):** (Mais relevante ao comparar um conjunto de previsões com um conjunto de observações para múltiplos espécimes ou ao longo do tempo) Indica a proporção da variância nas medições experimentais que é "explicada" pelo modelo. Valores mais próximos de 1 indicam melhor ajuste.
+    
+    -   **Testes de Hipótese:** Usados para avaliar formalmente se a diferença observada entre a previsão do modelo e a média experimental é estatisticamente significativa (improvável de ocorrer por acaso).
+        -   **Teste t de Student (1 amostra):** Assume que as medições experimentais seguem uma distribuição normal e compara a média da amostra experimental com o valor previsto pelo modelo (tratado como um valor hipotético populacional).
+        -   **Testes Não Paramétricos (Mann-Whitney, Wilcoxon, Sinal):** Úteis quando as suposições de normalidade do teste t não são atendidas ou com amostras pequenas. Eles comparam medianas ou distribuições, ou se baseiam apenas no sinal das diferenças. Embora o Mann-Whitney seja tipicamente para duas amostras, aqui foi adaptado para comparar com um valor constante, mas sua interpretação requer cautela.
+    
+    -   **Análise de Regressão (Experimental vs. Modelo):** Uma abordagem poderosa é regredir as médias experimentais observadas (Y) contra os valores previstos pelo modelo (X) através de múltiplos espécimes. Uma regressão ideal \( (\text{Experimental} = \beta_0 + \beta_1 \times \text{Modelo} + \epsilon) \) teria um intercepto \( \beta_0 \approx 0 \) (indicando ausência de viés sistemático) e uma inclinação \( \beta_1 \approx 1 \) (indicando que o modelo escala corretamente as previsões), com um \( R^2 \) alto e resíduos \( \epsilon \) distribuídos aleatoriamente sem padrões.
+    
+    ### 🎯 Aprofundamento e Robustez (Caminhos para PhD)
+    
+    Para uma avaliação probabilisticamente mais rica e robusta, considere:
+    
+    1.  **Quantificação da Incerteza:**
+        -   **Intervalos de Confiança:** Para a média experimental.
+        -   **Intervalos de Predição:** Para as futuras medições de ET, incorporando a incerteza do modelo e a variabilidade residual.
+        -   **Métodos Bayesianos:** Permitem incorporar conhecimento prévio (priors), estimar distribuições de probabilidade para os parâmetros do modelo e obter intervalos de credibilidade para as previsões. Fornecem uma estrutura formal para atualizar o conhecimento à medida que novos dados se tornam disponíveis.
+        -   **Propagação de Erro/Análise de Sensibilidade:** Analisar como a incerteza nas variáveis de entrada (medições físicas, dados climáticos) se propaga para a previsão da ET.
 
-    ## 🛠️ Melhores Práticas Finais
-    - **Validar dados de entrada:** Ex.: altura entre 0,5m e 100m, diâmetro em faixas plausíveis, etc.
-    - **Incorporar dados climáticos:** Temperatura, umidade, radiação solar e velocidade do vento para maior precisão.
-    - **Utilizar modelos avançados:** Como **CNNs**, treinados com dados reais para estimar evapotranspiração.
-    - **Fornecer múltiplas medições:** Para cada espécime em diferentes condições para robustez.
+    2.  **Análise de Resíduos:** Examinar os resíduos (\( \text{Experimental} - \text{Modelo} \)) para identificar padrões (por exemplo, heterocedasticidade, viés em certas faixas de valores, dependência temporal/espacial) que indicam falhas nas suposições do modelo ou variáveis preditoras ausentes.
+    
+    3.  **Validação Cruzada:** Dividir o conjunto de dados em subconjuntos de treino e teste para avaliar o desempenho do modelo em dados não vistos.
+    
+    4.  **Testes Baseados em Reamostragem:** Bootstrap (para estimar a distribuição de métricas de desempenho ou incerteza) e Testes de Permutação (para testes de hipótese não paramétricos robustos).
+    
+    5.  **Modelagem Hierárquica ou de Efeitos Mistos:** Se houver dados agrupados (por exemplo, múltiplas medições no mesmo espécime, múltiplos espécimes no mesmo local), estes modelos podem lidar com a estrutura de dependência dos dados e permitir a estimação de efeitos específicos por grupo (espécime/local) e efeitos gerais.
+    
+    6.  **Integração com Modelos de Machine Learning (ML):**
+        -   **Substituição do Modelo Empírico:** Treinar modelos de ML (ex: Random Forest, Gradient Boosting, Support Vector Regression, Redes Neurais) usando um conjunto de dados abrangente (características físicas, climáticas, LAI, e ET experimental) para desenvolver uma função `predict_evapotranspiration` mais precisa e potencialmente não linear. Bibliotecas como `scikit-learn` são fundamentais.
+        -   **Extração de Características da Imagem:** Utilizar Redes Neurais Convolucionais (CNNs) para extrair características relevantes da imagem da planta (ex: densidade da copa, verdor, stress hídrico aparente) que podem servir como preditores adicionais para o modelo de ET.
+        -   **Modelos Híbridos:** Combinar abordagens baseadas em física com ML.
+    
+    7.  **Considerações sobre q-Estatística (Estatística de Tsallis):**
+        -   A q-estatística generaliza a estatística de Boltzmann-Gibbs e é aplicada em sistemas complexos com características não extensivas, como interações de longo alcance, memória, ou estruturas multifractais.
+        -   No contexto ecológico da evapotranspiração, a aplicação da q-estatística (por exemplo, usando q-distribuições como a q-Gaussiana ou q-Exponencial para modelar a distribuição da ET ou dos erros do modelo) seria uma linha de pesquisa avançada. Exigiria uma justificativa teórica robusta para supor que os processos subjacentes à ET exibem tais propriedades não extensivas. Se essa hipótese for válida, a q-estatística poderia oferecer ferramentas para descrever distribuições de cauda pesada ou outras anomalias não capturadas pela estatística tradicional.
+    
+    Implementar essas abordagens transforma a análise de uma simples comparação ponto a ponto para uma avaliação probabilística rigorosa do modelo, essencial para uma tese de doutorado.
+    
+    ### ⚠️ Limitações do Modelo Atual
+    
+    É fundamental reconhecer as limitações do modelo linear simplificado e da abordagem de comparação atual para um trabalho de doutorado. A robustez e a complexidade de nível PhD viriam da aplicação das técnicas avançadas descritas acima e da construção/validação rigorosa de um modelo biofísico ou estatístico/ML mais sofisticado, calibrado com dados experimentais abrangentes e de alta qualidade.
     """)
 
 # ---------------------------------------------------------------
-# 12. Avaliação Prática Máxima
+# 12. Avaliação Prática Máxima (Keep this section as a summary/roadmap)
 # ---------------------------------------------------------------
-st.header("7) Avaliação Prática Máxima")
+st.header("7) Avaliação Prática e Direções Futuras (Nível PhD)")
 st.markdown("""
-Após realizar os cálculos e análises estatísticas, é importante validar os resultados obtidos para garantir a precisão e confiabilidade do modelo de evapotranspiração.
+Para solidificar a abordagem a um nível de doutorado e garantir a validade ecológica e estatística dos resultados, os seguintes passos são cruciais, construindo sobre as análises realizadas:
 
-### 📝 Passos para Avaliação Prática:
-1. **Comparação com Dados Reais:**
-   - Compare os valores estimados com medições de campo ou dados científicos.
+### 📝 Roteiro para Aprofundamento:
 
-2. **Análise de Sensibilidade:**
-   - Veja como alterações nas variáveis (altura, diâmetro, copa, LAI, temperatura, umidade, radiação, vento) afetam os resultados.
+1.  **Revisão Crítica do Modelo Empírico:** Avaliar a justificação teórica para os pesos e a estrutura do modelo linear. Idealmente, transitar para um modelo biofísico (Penman-Monteith, etc.) ou desenvolver um modelo estatístico/ML a partir de dados.
+2.  **Expansão e Cura de Dados:** Coletar um conjunto de dados experimentais muito maior, abrangendo diversas espécies, locais, condições climáticas e estágios fenológicos. Garantir a qualidade dos dados (tratamento de outliers, dados faltantes).
+3.  **Calibração e Validação Rigorosa:** Utilizar o conjunto de dados expandido para calibrar os parâmetros do modelo (se for um modelo paramétrico) e validar seu desempenho em um conjunto de dados independente (Validação Cruzada).
+4.  **Quantificação Completa da Incerteza:** Estimar e apresentar a incerteza associada às previsões do modelo e às medições experimentais. Utilizar métodos como bootstrap, simulações de Monte Carlo ou abordagens Bayesianas para obter intervalos de predição ou credibilidade.
+5.  **Análise Profunda de Resíduos:** Investigar os resíduos para entender onde e por que o modelo erra. Isso pode revelar a necessidade de incluir novas variáveis preditoras ou refinar a estrutura do modelo.
+6.  **Análise de Sensibilidade Global:** Determinar quais variáveis de entrada (características da planta, clima) têm o maior impacto na previsão da ET e na sua incerteza.
+7.  **Considerações Espaciais e Temporais:** Se os dados permitirem, incorporar a autocorrelação espacial e temporal nas análises estatísticas e na modelagem. Modelos de séries temporais ou modelos espaciais podem ser necessários.
+8.  **Modelagem Hierárquica:** Se aplicável, usar modelos de efeitos mistos para lidar com a estrutura aninhada dos dados (por exemplo, medições dentro de galhos, galhos dentro de árvores, árvores dentro de locais).
+9.  **Integração Multimodal:** Explorar a integração de dados de imagem (usando técnicas de Computer Vision para extrair características como área foliar, densidade da copa, saúde da planta) com dados tabulares (características físicas e climáticas) em modelos unificados (por exemplo, redes neurais multimodais).
+10. **Interpretação Ecológica:** Relacionar os resultados estatísticos e as limitações do modelo com os princípios ecológicos subjacentes que regem a evapotranspiração. Discutir as implicações dos resultados para a gestão da água, ecologia florestal ou modelagem climática.
 
-3. **Validação Cruzada:**
-   - Teste o modelo com diferentes conjuntos de dados para verificar sua generalização.
+### 🛡️ Confiabilidade e Reproducibilidade:
 
-4. **Incorporação de Fatores Climáticos:**
-   - Considere variáveis climáticas no modelo para maior precisão.
+-   **Documentação Detalhada:** Documentar rigorosamente todo o pipeline de dados, o modelo, as análises estatísticas e as suposições feitas.
+-   **Código Aberto e Reprodutível:** Compartilhar o código e os dados (se possível e apropriado) para garantir a reprodutibilidade dos resultados.
+-   **Revisão por Pares:** Submeter o trabalho à revisão crítica de especialistas em ecologia, hidrologia e estatística.
 
-5. **Feedback de Especialistas:**
-   - Consulte especialistas para interpretar resultados e melhorar o modelo.
+### 📈 Visualizações Avançadas:
 
-6. **Aprimoramento Contínuo:**
-   - Ajuste os coeficientes e utilize aprendizado de máquina para refinar as estimativas.
+-   **Gráficos de Resíduos:** Para diagnosticar problemas do modelo.
+-   **Gráficos de Dispersão (Observed vs. Predicted):** Com linha 1:1 e linha de regressão, incluindo intervalos de incerteza.
+-   **Mapas de Calor ou Gráficos de Superfície:** Para visualizar interações entre variáveis ou padrões espaciais/temporais.
+-   **Boxplots ou Gráficos de Violino:** Para comparar distribuições de ET entre diferentes grupos de espécimes ou sob diferentes condições.
 
-### 📈 Visualizações Adicionais:
-- **Histograma:** Para observar a distribuição dos valores estimados.
-- **Boxplot:** Para visualizar a dispersão e detectar outliers.
-- **Mapa de Calor:** Se houver múltiplas variáveis climáticas.
-
-### 🔄 Repetibilidade:
-- **Documentação e Reprodutibilidade:** Mantenha a documentação clara e assegure reprodutibilidade.
-
-### 🛡️ Confiabilidade:
-- **Validação de Dados e Tratamento de Erros:** Garanta precisão e robustez do modelo.
-
-### 📅 Atualizações Futuras:
-- **Integração com Bancos de Dados:** Para armazenamento persistente.
-- **Interface Melhorada:** Funcionalidades interativas adicionais.
-- **Machine Learning:** Integração com modelos avançados.
-
-**Conclusão:** A avaliação prática reforça a precisão do modelo e orienta melhorias contínuas para atender às necessidades dos usuários de maneira confiável e eficiente.
+**Conclusão:** Alcançar um nível de doutorado na avaliação probabilística da evapotranspiração requer ir além da aplicação de testes estatísticos básicos. Envolve a construção e validação rigorosa de modelos (sejam eles biofísicos, estatísticos ou de machine learning), a quantificação exaustiva da incerteza, a análise crítica das suposições do modelo e a integração de conhecimentos de diferentes disciplinas (ecologia, estatística, sensoriamento remoto, ciência de dados). Esta aplicação Streamlit serve como um excelente ponto de partida para explorar esses conceitos e visualizar resultados preliminares.
 """)
