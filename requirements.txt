@@ -1,7 +1,5 @@
-streamlit 
-pillow 
-numpy 
-scipy 
-pandas 
+scipy
+pandas
 matplotlib
 sklearn
+scikit-learn
